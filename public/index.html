@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🦈 BETesporte Monitor - Dashboard</title>
+    <link rel="stylesheet" href="dashboard.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦈</text></svg>">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <div class="logo-icon">🦈</div>
+                    <div class="logo-text">
+                        <h1>BETesporte Monitor</h1>
+                        <p>SuperOdds em tempo real</p>
+                    </div>
+                </div>
+                <div class="header-controls">
+                    <button id="themeToggle" class="theme-btn">🌙</button>
+                    <button id="refreshBtn" class="refresh-btn">🔄</button>
+                    <div class="status-indicator" id="statusIndicator">
+                        <div class="status-dot"></div>
+                        <span>Conectando...</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Stats Cards -->
+        <section class="stats-section">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">📊</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="totalOdds">--</div>
+                        <div class="stat-label">SuperOdds Ativas</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🔥</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="maxOdd">--</div>
+                        <div class="stat-label">Maior Odd</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">⏱️</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="lastUpdate">--</div>
+                        <div class="stat-label">Última Atualização</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📈</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="todayTotal">--</div>
+                        <div class="stat-label">Hoje (Total)</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Controls -->
+        <section class="controls-section">
+            <div class="controls-card">
+                <h3>Controles</h3>
+                <div class="controls-grid">
+                    <div class="control-group">
+                        <label for="intervalSelect">Intervalo de Atualização:</label>
+                        <select id="intervalSelect">
+                            <option value="10000">10 segundos</option>
+                            <option value="30000" selected>30 segundos</option>
+                            <option value="60000">1 minuto</option>
+                            <option value="300000">5 minutos</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="urlInput">URL Customizada:</label>
+                        <input type="url" id="urlInput" placeholder="https://betesporte.bet.br/...">
+                    </div>
+                    <div class="control-buttons">
+                        <button id="startBtn" class="btn btn-primary">▶️ Iniciar</button>
+                        <button id="stopBtn" class="btn btn-secondary">⏹️ Parar</button>
+                        <button id="forceUpdateBtn" class="btn btn-accent">🔄 Forçar Update</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SuperOdds Display -->
+        <section class="odds-section">
+            <div class="odds-header">
+                <h3>🎯 SuperOdds Detectadas</h3>
+                <div class="odds-filters">
+                    <button class="filter-btn active" data-filter="all">Todas</button>
+                    <button class="filter-btn" data-filter="high">Odds Altas (5.0+)</button>
+                    <button class="filter-btn" data-filter="boosted">Com Boost</button>
+                </div>
+            </div>
+            <div class="odds-container" id="oddsContainer">
+                <div class="empty-state">
+                    <div class="empty-icon">🎲</div>
+                    <h4>Nenhuma SuperOdd encontrada</h4>
+                    <p>Inicie o monitoramento para detectar SuperOdds em tempo real</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Activity Log -->
+        <section class="log-section">
+            <div class="log-header">
+                <h3>📝 Log de Atividades</h3>
+                <button id="clearLogBtn" class="btn btn-small">Limpar</button>
+            </div>
+            <div class="log-container" id="logContainer">
+                <div class="log-entry">
+                    <span class="log-time">[${new Date().toLocaleTimeString()}]</span>
+                    <span class="log-message">Dashboard inicializado</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>🦈 Shark Green Monitor - Desenvolvido para uso educacional</p>
+            <p>
+                <a href="https://github.com/SEU-USUARIO/betesporte-monitor" target="_blank">GitHub</a> |
+                <a href="/api/superodds" target="_blank">API</a> |
+                <a href="https://t.me/+M1SY4YU6T-pjYWQx" target="_blank">Telegram</a>
+            </p>
+        </footer>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <p>Buscando SuperOdds...</p>
+    </div>
+
+    <!-- Notification Container -->
+    <div class="notification-container" id="notificationContainer"></div>
+
+    <script src="dashboard.js"></script>
+</body>
+</html>
