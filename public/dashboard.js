@@ -124,53 +124,100 @@ class BetEsporteDashboard {
 
   // MÉTODO ATUALIZADO COM DETECÇÃO DE ERRO 403
   async fetchSuperOdds(force = false) {
-    try {
-      this.showLoading(true);
-      
-      const customUrl = document.getElementById('urlInput').value.trim();
-      let apiUrl = '/api/superodds';
-      
-      if (customUrl) {
-        apiUrl += `?url=${encodeURIComponent(customUrl)}`;
-      }
-      
-      if (force) {
-        apiUrl += (customUrl ? '&' : '?') + 'force=1';
-      }
-      
-      console.log('🔍 Buscando SuperOdds:', apiUrl);
-      
-      const response = await fetch(apiUrl);
-      const data = await response.json();
-      
-      if (data.success) {
-        this.handleSuperOddsData(data);
-        this.updateStatus('Online', 'online');
-        // Remove modo manual se estava ativo
-        this.disableManualMode();
-      } else {
-        throw new Error(data.error || 'Erro desconhecido');
-      }
-      
-    } catch (error) {
-      console.error('❌ Erro ao buscar SuperOdds:', error);
-      this.addLog(`Erro: ${error.message}`, 'error');
-      this.updateStatus('Erro', 'error');
-      
-      // NOVA FUNCIONALIDADE: Habilita modo manual se erro 403
-      if (error.message.includes('403') || 
-          error.message.includes('Forbidden') || 
-          error.message.includes('bloqueado') ||
-          error.message.includes('blocked')) {
-        this.enableManualMode();
-        this.showNotification('API Bloqueada', 'Modo manual ativado. Cole o HTML da página.', 'warning');
-      } else {
-        this.showNotification('Erro ao buscar SuperOdds', error.message, 'error');
-      }
-    } finally {
-      this.showLoading(false);
+  try {
+    this.showLoading(true);
+    
+    const customUrl = document.getElementById('urlInput').value.trim();
+    let apiUrl = '/api/superodds';
+    
+    if (customUrl) {
+      apiUrl += `?url=${encodeURIComponent(customUrl)}`;
     }
+    
+    if (force) {
+      apiUrl += (customUrl ? '&' : '?') + 'force=1';
+    }
+    
+    console.log('🔍 Buscando SuperOdds:', apiUrl);
+    
+    const response = await fetch(apiUrl);
+    const data = await response.json();
+    
+    if (data.success) {
+      this.handleSuperOddsData(data);
+      this.updateStatus('Online', 'online');
+      
+      // Log informações de estratégia usada
+      if (data.fetchMethod) {
+        this.addLog(`✅ Conectado via: ${data.fetchMethod}`, 'success');
+      }
+      
+      // Remove modo manual se estava ativo
+      this.disableManualMode();
+    } else {
+      throw new Error(data.error || 'Erro desconhecido');
+    }
+    
+  } catch (error) {
+    console.error('❌ Erro ao buscar SuperOdds:', error);
+    
+    // Parse da resposta de erro se disponível
+    let errorData = null;
+    try {
+      const response = await fetch('/api/superodds');
+      if (!response.ok) {
+        errorData = await response.json();
+      }
+    } catch (e) {
+      // Ignora erro de parse
+    }
+    
+    this.addLog(`❌ Erro: ${error.message}`, 'error');
+    this.updateStatus('Erro', 'error');
+    
+    // Verifica se é erro de bloqueio
+    const isBlocked = error.message.includes('403') || 
+                     error.message.includes('Forbidden') || 
+                     error.message.includes('bloqueado') ||
+                     error.message.includes('blocked') ||
+                     error.message.includes('Site pode estar bloqueando') ||
+                     (errorData && errorData.block_detected);
+    
+    if (isBlocked) {
+      this.enableManualMode();
+      
+      // Mostra sugestões específicas
+      const suggestions = errorData?.suggestions || [
+        'Site bloqueando requisições automáticas',
+        'Use o modo manual para continuar',
+        'Tente uma VPN se o problema persistir'
+      ];
+      
+      this.addLog('🚫 Site bloqueando requisições - Modo manual ativo', 'warning');
+      
+      this.showNotification(
+        'API Bloqueada', 
+        'Todas as estratégias falharam. Modo manual ativado automaticamente.', 
+        'warning'
+      );
+      
+      // Adiciona sugestões no log
+      suggestions.forEach(suggestion => {
+        this.addLog(`💡 ${suggestion}`, 'info');
+      });
+      
+    } else {
+      // Outros tipos de erro
+      this.showNotification('Erro de Conexão', error.message, 'error');
+      
+      // Sugestões genéricas
+      this.addLog('💡 Tente: Aguardar alguns minutos e tentar novamente', 'info');
+      this.addLog('💡 Verificar conexão com a internet', 'info');
+    }
+  } finally {
+    this.showLoading(false);
   }
+}
 
   // NOVA FUNÇÃO: Ativa modo manual
   enableManualMode() {
