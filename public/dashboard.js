@@ -1072,3 +1072,322 @@ Comandos disponíveis no console:
 🚀 Dashboard pronto para uso!
   `);
 });
+
+// Adicione no constructor (junto com as outras propriedades):
+this.htmlBaseMode = false;
+this.savedHtmlBase = null;
+this.htmlUpdateInterval = null;
+this.lastOddsSignature = null;
+
+// Adicione no bindEvents():
+document.getElementById('htmlBaseModeBtn').addEventListener('click', () => {
+  this.enableHtmlBaseMode();
+});
+
+// ===== MÉTODOS NOVOS =====
+
+enableHtmlBaseMode() {
+  this.htmlBaseMode = true;
+  
+  // Para outros modos se ativos
+  if (this.isMonitoring) {
+    this.stopMonitoring();
+  }
+  this.disableManualMode();
+  
+  this.showHtmlBaseSection();
+  
+  this.addLog('💾 Modo HTML Base ativado', 'success');
+  this.updateStatus('HTML Base Mode', 'online');
+}
+
+showHtmlBaseSection() {
+  const existing = document.getElementById('htmlBaseSection');
+  if (existing) existing.remove();
+  
+  const htmlBaseSection = document.createElement('div');
+  htmlBaseSection.id = 'htmlBaseSection';
+  htmlBaseSection.className = 'html-base-section';
+  htmlBaseSection.innerHTML = `
+    <div class="controls-card" style="border: 2px solid #8b5cf6; background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), var(--bg-card));">
+      <h3>💾 Modo HTML Base + Auto-Update</h3>
+      <p style="color: var(--accent); margin-bottom: 16px;">
+        🚀 Salve o HTML uma vez e monitore só as SuperOdds automaticamente!
+      </p>
+      
+      <div class="html-base-steps">
+        <div class="step-card">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <strong>Cole o HTML Base:</strong>
+            <textarea 
+              id="htmlBaseInput" 
+              rows="6" 
+              placeholder="Cole aqui o HTML copiado do BETesporte..."
+              style="font-family: monospace; font-size: 11px; margin-top: 8px;"
+            ></textarea>
+          </div>
+        </div>
+        
+        <div class="step-card">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <strong>Configure Auto-Update:</strong>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;">
+              <select id="htmlUpdateInterval">
+                <option value="30">30 segundos</option>
+                <option value="60" selected>1 minuto</option>
+                <option value="120">2 minutos</option>
+                <option value="300">5 minutos</option>
+              </select>
+              
+              <div id="htmlBaseStatus" style="padding: 8px; background: var(--bg-secondary); border-radius: 4px; text-align: center; font-size: 12px;">
+                Aguardando...
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="control-buttons">
+        <button id="saveHtmlBaseBtn" class="btn btn-primary">💾 Salvar HTML Base</button>
+        <button id="startHtmlUpdateBtn" class="btn btn-accent" disabled>🔄 Iniciar Auto-Update</button>
+        <button id="stopHtmlUpdateBtn" class="btn btn-secondary" disabled>⏹️ Parar Auto-Update</button>
+        <button id="testHtmlBaseBtn" class="btn btn-outline" disabled>🧪 Testar Agora</button>
+      </div>
+      
+      <div class="html-base-info" style="margin-top: 16px; padding: 12px; background: var(--bg-secondary); border-radius: 8px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; font-size: 12px;">
+          <div>
+            <strong>HTML Salvo:</strong>
+            <div id="htmlSizeInfo">--</div>
+          </div>
+          <div>
+            <strong>Última Verificação:</strong>
+            <div id="lastHtmlCheck">--</div>
+          </div>
+          <div>
+            <strong>SuperOdds Detectadas:</strong>
+            <div id="htmlOddsCount">--</div>
+          </div>
+        </div>
+      </div>
+      
+      <button id="disableHtmlBaseBtn" class="btn btn-small" style="margin-top: 12px;">❌ Desativar Modo</button>
+    </div>
+  `;
+  
+  const controlsSection = document.querySelector('.controls-section');
+  controlsSection.after(htmlBaseSection);
+  
+  // Event listeners
+  document.getElementById('saveHtmlBaseBtn').addEventListener('click', () => this.saveHtmlBase());
+  document.getElementById('startHtmlUpdateBtn').addEventListener('click', () => this.startHtmlAutoUpdate());
+  document.getElementById('stopHtmlUpdateBtn').addEventListener('click', () => this.stopHtmlAutoUpdate());
+  document.getElementById('testHtmlBaseBtn').addEventListener('click', () => this.testHtmlBase());
+  document.getElementById('disableHtmlBaseBtn').addEventListener('click', () => this.disableHtmlBaseMode());
+}
+
+async saveHtmlBase() {
+  const html = document.getElementById('htmlBaseInput').value.trim();
+  
+  if (!html) {
+    this.showNotification('Erro', 'Cole o HTML da página primeiro', 'error');
+    return;
+  }
+  
+  if (html.length < 1000) {
+    this.showNotification('Aviso', 'HTML parece muito pequeno. Certifique-se de copiar a página completa.', 'warning');
+  }
+  
+  try {
+    this.savedHtmlBase = html;
+    
+    // Salva no localStorage
+    localStorage.setItem('betesporte_html_base', html);
+    localStorage.setItem('betesporte_html_base_timestamp', Date.now());
+    
+    document.getElementById('htmlSizeInfo').textContent = `${Math.round(html.length / 1024)}KB`;
+    document.getElementById('startHtmlUpdateBtn').disabled = false;
+    document.getElementById('testHtmlBaseBtn').disabled = false;
+    
+    // Testa imediatamente
+    await this.testHtmlBase();
+    
+    this.addLog('💾 HTML base salvo com sucesso', 'success');
+    this.showNotification('HTML Salvo!', 'Base HTML salva. Agora pode iniciar auto-update.', 'success');
+    
+  } catch (error) {
+    this.addLog(`❌ Erro ao salvar HTML: ${error.message}`, 'error');
+    this.showNotification('Erro', error.message, 'error');
+  }
+}
+
+startHtmlAutoUpdate() {
+  if (!this.savedHtmlBase) {
+    this.showNotification('Erro', 'Salve o HTML base primeiro', 'error');
+    return;
+  }
+  
+  const interval = parseInt(document.getElementById('htmlUpdateInterval').value) * 1000;
+  
+  this.addLog(`🔄 Auto-update iniciado (${interval/1000}s)`, 'success');
+  this.updateHtmlBaseStatus('🔄 Ativo');
+  
+  // Primeira verificação imediata
+  this.processHtmlBase();
+  
+  // Inicia interval
+  this.htmlUpdateInterval = setInterval(() => {
+    this.processHtmlBase();
+  }, interval);
+  
+  // Atualiza botões
+  document.getElementById('startHtmlUpdateBtn').disabled = true;
+  document.getElementById('stopHtmlUpdateBtn').disabled = false;
+}
+
+stopHtmlAutoUpdate() {
+  if (this.htmlUpdateInterval) {
+    clearInterval(this.htmlUpdateInterval);
+    this.htmlUpdateInterval = null;
+  }
+  
+  this.addLog('⏹️ Auto-update parado', 'warning');
+  this.updateHtmlBaseStatus('⏹️ Parado');
+  
+  // Atualiza botões
+  document.getElementById('startHtmlUpdateBtn').disabled = false;
+  document.getElementById('stopHtmlUpdateBtn').disabled = true;
+}
+
+async testHtmlBase() {
+  if (!this.savedHtmlBase) {
+    this.showNotification('Erro', 'Nenhum HTML base salvo', 'error');
+    return;
+  }
+  
+  await this.processHtmlBase(true);
+}
+
+async processHtmlBase(isTest = false) {
+  try {
+    if (isTest) {
+      this.updateHtmlBaseStatus('🧪 Testando...');
+    } else {
+      this.updateHtmlBaseStatus('🔍 Verificando...');
+    }
+    
+    // Usa a API parse-html com HTML salvo
+    const response = await fetch('/api/parse-html', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ html: this.savedHtmlBase })
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      // Verifica se houve mudanças
+      const currentOddsSignature = this.generateOddsSignature(data.odds);
+      const hasChanges = !this.lastOddsSignature || this.lastOddsSignature !== currentOddsSignature;
+      
+      if (hasChanges) {
+        this.lastOddsSignature = currentOddsSignature;
+        
+        this.handleSuperOddsData(data);
+        this.addLog(`💾 HTML processado: ${data.totalOdds} SuperOdds${hasChanges ? ' (MUDANÇAS!)' : ''}`, 'success');
+        
+        if (!isTest) {
+          this.showNotification('SuperOdds Atualizadas!', `${data.totalOdds} odds do HTML base`, 'success');
+        }
+      } else if (isTest) {
+        this.addLog(`🧪 Teste OK: ${data.totalOdds} SuperOdds (sem mudanças)`, 'info');
+      }
+      
+      // Atualiza interface
+      document.getElementById('htmlOddsCount').textContent = data.totalOdds;
+      document.getElementById('lastHtmlCheck').textContent = new Date().toLocaleTimeString();
+      
+      if (isTest) {
+        this.updateHtmlBaseStatus('✅ Teste OK');
+        setTimeout(() => {
+          if (!this.htmlUpdateInterval) {
+            this.updateHtmlBaseStatus('⏹️ Parado');
+          }
+        }, 2000);
+      } else {
+        this.updateHtmlBaseStatus('✅ Ativo');
+      }
+      
+    } else {
+      throw new Error(data.error || 'Erro ao processar HTML base');
+    }
+    
+  } catch (error) {
+    this.addLog(`❌ Erro no HTML base: ${error.message}`, 'error');
+    this.updateHtmlBaseStatus('❌ Erro');
+    
+    if (isTest) {
+      this.showNotification('Erro no Teste', error.message, 'error');
+    }
+  }
+}
+
+generateOddsSignature(odds) {
+  if (!odds || odds.length === 0) return 'empty';
+  
+  // Cria assinatura única baseada nas odds
+  const signature = odds
+    .map(odd => `${odd.oddValue}_${odd.market}_${odd.team}`)
+    .sort()
+    .join('|');
+    
+  return btoa(signature).substring(0, 20); // Hash simples
+}
+
+updateHtmlBaseStatus(status) {
+  const statusEl = document.getElementById('htmlBaseStatus');
+  if (statusEl) {
+    statusEl.textContent = status;
+  }
+}
+
+disableHtmlBaseMode() {
+  this.htmlBaseMode = false;
+  this.stopHtmlAutoUpdate();
+  
+  const section = document.getElementById('htmlBaseSection');
+  if (section) section.remove();
+  
+  this.addLog('❌ Modo HTML Base desativado', 'info');
+  this.updateStatus('Parado', 'warning');
+}
+
+// Carrega HTML base salvo ao inicializar
+async loadSavedHtmlBase() {
+  try {
+    const savedHtml = localStorage.getItem('betesporte_html_base');
+    const timestamp = localStorage.getItem('betesporte_html_base_timestamp');
+    
+    if (savedHtml && timestamp) {
+      const age = Date.now() - parseInt(timestamp);
+      const ageHours = age / (1000 * 60 * 60);
+      
+      if (ageHours < 24) { // HTML válido por 24 horas
+        this.savedHtmlBase = savedHtml;
+        this.addLog(`💾 HTML base carregado (${ageHours.toFixed(1)}h atrás)`, 'info');
+        return true;
+      } else {
+        this.addLog('⚠️ HTML base expirado (>24h), salve um novo', 'warning');
+      }
+    }
+  } catch (error) {
+    console.warn('Erro ao carregar HTML base:', error);
+  }
+  
+  return false;
+}
+
+// ADICIONE TAMBÉM no método init() do dashboard:
+// this.loadSavedHtmlBase();
