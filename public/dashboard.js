@@ -111,12 +111,14 @@ class BetEsporteDashboard {
       this.intervalId = null;
     }
     
-    this.addLog('Monitoramento parado', 'warning');
+    this.addLog('🛑 Monitoramento parado', 'warning');
     this.updateStatus('Parado', 'warning');
     
     // Atualiza UI
     document.getElementById('startBtn').style.opacity = '1';
     document.getElementById('stopBtn').style.opacity = '0.5';
+    document.getElementById('startBtn').disabled = false;
+    document.getElementById('stopBtn').disabled = true;
   }
 
   async fetchSuperOdds(force = false) {
@@ -455,4 +457,34 @@ class BetEsporteDashboard {
     a.click();
     
     URL.revokeObjectURL(url);
-    this.addLog('Dados exportados com sucesso
+    this.addLog('Dados exportados com sucesso', 'success');
+  }
+}
+
+// Auto-save das configurações
+window.addEventListener('beforeunload', () => {
+  if (window.dashboard) {
+    window.dashboard.saveSettings();
+  }
+});
+
+// Inicializa dashboard quando DOM estiver pronto
+document.addEventListener('DOMContentLoaded', () => {
+  window.dashboard = new BetEsporteDashboard();
+  
+  // Disponibiliza métodos globais para debug
+  window.exportData = () => window.dashboard.exportData();
+  
+  console.log(`
+🦈 ===== BETESPORTE DASHBOARD CARREGADO =====
+
+Comandos disponíveis no console:
+• dashboard.startMonitoring() - Inicia monitoramento
+• dashboard.stopMonitoring() - Para monitoramento
+• dashboard.fetchSuperOdds(true) - Força atualização
+• exportData() - Exporta dados coletados
+• dashboard.showNotification() - Testa notificações
+
+🚀 Dashboard pronto para uso!
+  `);
+});
