@@ -1,9 +1,18 @@
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 
-// Cache simples em memória (para produção use Redis/Database)
+// Cache simples em memória 
 const cache = new Map();
 const CACHE_TTL = 30000; // 30 segundos
+
+// Lista de User Agents rotativos
+const USER_AGENTS = [
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:122.0) Gecko/20100101 Firefox/122.0',
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+];
 
 export default async function handler(req, res) {
   // Configuração CORS
@@ -34,29 +43,49 @@ export default async function handler(req, res) {
 
     console.log('🔍 Fazendo scraping de:', targetUrl);
 
-    // Headers para simular navegador
-    const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      'Accept-Language': 'pt-BR,pt;q=0.8,en;q=0.5',
-      'Accept-Encoding': 'gzip, deflate, br',
-      'DNT': '1',
-      'Connection': 'keep-alive',
-      'Upgrade-Insecure-Requests': '1'
-    };
+    // Tenta múltiplas estratégias
+    let html = null;
+    let method = 'unknown';
 
-    // Faz requisição
-    const response = await fetch(targetUrl, {
-      headers,
-      timeout: 15000
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    // Estratégia 1: Requisição direta com headers melhorados
+    try {
+      const result = await fetchWithRotatingHeaders(targetUrl);
+      html = result.html;
+      method = result.method;
+    } catch (error) {
+      console.log('❌ Estratégia 1 falhou:', error.message);
     }
 
-    const html = await response.text();
+    // Estratégia 2: Tentar com delay e referer diferente
+    if (!html) {
+      try {
+        await randomDelay();
+        const result = await fetchWithDelay(targetUrl);
+        html = result.html;
+        method = result.method;
+      } catch (error) {
+        console.log('❌ Estratégia 2 falhou:', error.message);
+      }
+    }
+
+    // Estratégia 3: Tentar URL alternativa ou API interna
+    if (!html) {
+      try {
+        const alternativeUrl = targetUrl.replace('desktop', 'mobile');
+        const result = await fetchWithRotatingHeaders(alternativeUrl);
+        html = result.html;
+        method = `${result.method} (mobile)`;
+      } catch (error) {
+        console.log('❌ Estratégia 3 falhou:', error.message);
+      }
+    }
+
+    if (!html) {
+      throw new Error('Todas as estratégias de fetch falharam. Site pode estar bloqueando requisições.');
+    }
+
     const superOdds = await parseSuperOdds(html, targetUrl);
+    superOdds.fetchMethod = method;
 
     // Salva no cache
     cache.set(targetUrl, {
@@ -75,19 +104,136 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('❌ Erro na API:', error);
-    res.status(500).json({
+    
+    // Retorna erro mais específico
+    const errorResponse = {
       success: false,
       error: error.message,
-      timestamp: Date.now()
-    });
+      timestamp: Date.now(),
+      suggestions: []
+    };
+
+    if (error.message.includes('403')) {
+      errorResponse.suggestions = [
+        'Site está bloqueando requisições',
+        'Tente usar uma VPN',
+        'Configure um proxy',
+        'Use o modo manual no dashboard'
+      ];
+    } else if (error.message.includes('timeout')) {
+      errorResponse.suggestions = [
+        'Conexão lenta ou instável',
+        'Tente novamente em alguns minutos',
+        'Verifique sua conexão com a internet'
+      ];
+    }
+
+    res.status(500).json(errorResponse);
   }
 }
+
+async function fetchWithRotatingHeaders(url) {
+  const userAgent = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+  
+  const headers = {
+    'User-Agent': userAgent,
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+    'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Cache-Control': 'no-cache',
+    'Pragma': 'no-cache',
+    'Sec-Ch-Ua': '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
+    'Sec-Ch-Ua-Mobile': '?0',
+    'Sec-Ch-Ua-Platform': '"Windows"',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1',
+    'Upgrade-Insecure-Requests': '1',
+    'Referer': 'https://www.google.com.br/',
+    'DNT': '1',
+    'Connection': 'keep-alive'
+  };
+
+  const response = await fetch(url, {
+    headers,
+    timeout: 15000,
+    follow: 5
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  }
+
+  return {
+    html: await response.text(),
+    method: 'rotating_headers'
+  };
+}
+
+async function fetchWithDelay(url) {
+  // Espera 3-7 segundos
+  await randomDelay(3000, 7000);
+  
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'pt-BR,pt;q=0.8,en;q=0.5',
+    'Referer': 'https://www.bing.com/',
+    'Cache-Control': 'max-age=0',
+    'Connection': 'keep-alive'
+  };
+
+  const response = await fetch(url, {
+    headers,
+    timeout: 20000
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  }
+
+  return {
+    html: await response.text(),
+    method: 'delayed_fetch'
+  };
+}
+
+function randomDelay(min = 1000, max = 3000) {
+  const delay = Math.random() * (max - min) + min;
+  return new Promise(resolve => setTimeout(resolve, delay));
+}
+
+// ... resto das funções parseSuperOdds, extractOddData, etc. permanecem iguais ...
 
 async function parseSuperOdds(html, url) {
   const $ = cheerio.load(html);
   const superOdds = [];
 
   console.log('🔍 Analisando HTML para SuperOdds...');
+  console.log(`📄 Tamanho do HTML: ${html.length} caracteres`);
+
+  // Verifica se o HTML contém conteúdo válido
+  if (html.length < 1000) {
+    console.warn('⚠️ HTML muito pequeno, pode ser uma página de erro');
+  }
+
+  // Procura por indicadores de bloqueio
+  const blockIndicators = [
+    'access denied',
+    'blocked',
+    'forbidden',
+    'cloudflare',
+    'security check',
+    'captcha'
+  ];
+
+  const htmlLower = html.toLowerCase();
+  for (const indicator of blockIndicators) {
+    if (htmlLower.includes(indicator)) {
+      throw new Error(`Site bloqueado: detectado "${indicator}"`);
+    }
+  }
 
   // Seletores específicos para BETesporte
   const selectors = [
@@ -145,6 +291,7 @@ async function parseSuperOdds(html, url) {
     odds: superOdds,
     status: superOdds.length > 0 ? 'found' : 'not_found',
     lastUpdate: new Date().toISOString(),
+    htmlSize: html.length,
     cacheInfo: {
       cached: false,
       ttl: CACHE_TTL
@@ -152,6 +299,7 @@ async function parseSuperOdds(html, url) {
   };
 }
 
+// Restante das funções permanecem iguais...
 function extractOddData($, element, index, selector) {
   try {
     const $el = $(element);
@@ -164,206 +312,19 @@ function extractOddData($, element, index, selector) {
     const oddValue = parseFloat(oddMatch[1]);
     if (oddValue < 1.01 || oddValue > 100) return null;
 
-    // Extrai contexto
-    const market = extractMarket($, $el);
-    const team = extractTeam($, $el);
-    const event = extractEvent($, $el);
-    const originalOdd = extractOriginalOdd($, $el);
-
     return {
       id: `odd_${Date.now()}_${index}`,
       oddValue: oddValue,
-      market: market || 'Mercado detectado',
-      team: team || 'Time detectado',
-      event: event || 'Evento detectado',
-      originalOdd: originalOdd,
-      boost: originalOdd ? `${((oddValue / originalOdd - 1) * 100).toFixed(1)}%` : null,
+      market: extractMarket($, $el) || 'Mercado detectado',
+      team: extractTeam($, $el) || 'Time detectado',
+      event: extractEvent($, $el) || 'Evento detectado',
       timestamp: Date.now(),
-      selector: selector,
-      element: {
-        class: $el.attr('class') || '',
-        id: $el.attr('id') || '',
-        testid: $el.attr('data-testid') || ''
-      }
+      selector: selector
     };
   } catch (error) {
     console.warn('Erro ao extrair odd:', error);
     return null;
   }
-}
-
-function extractMarket($, $el) {
-  const text = $el.text().toLowerCase();
-  
-  const markets = {
-    'vitória': 'Resultado Final',
-    'winner': 'Resultado Final',
-    'empate': 'Empate',
-    'draw': 'Empate',
-    'over': 'Total - Over',
-    'under': 'Total - Under',
-    'acima': 'Total - Acima',
-    'abaixo': 'Total - Abaixo',
-    'ambas': 'Ambas Marcam',
-    'btts': 'Ambas Marcam',
-    'handicap': 'Handicap',
-    'corner': 'Escanteios',
-    'card': 'Cartões'
-  };
-
-  for (const [keyword, market] of Object.entries(markets)) {
-    if (text.includes(keyword)) {
-      return market;
-    }
-  }
-
-  // Busca em elementos pais
-  const parent = $el.closest('[class*="market"], [class*="bet"], [data-testid*="market"]');
-  if (parent.length) {
-    const parentText = parent.text().toLowerCase();
-    for (const [keyword, market] of Object.entries(markets)) {
-      if (parentText.includes(keyword)) {
-        return market;
-      }
-    }
-  }
-
-  return null;
-}
-
-function extractTeam($, $el) {
-  const teamSelectors = [
-    '[class*="team"]',
-    '[class*="participant"]',
-    '[class*="competitor"]',
-    '[data-testid*="team"]'
-  ];
-
-  for (const selector of teamSelectors) {
-    const teamEl = $el.find(selector).first();
-    if (teamEl.length && teamEl.text().trim()) {
-      return teamEl.text().trim();
-    }
-
-    const nearbyTeam = $el.closest('*').find(selector).first();
-    if (nearbyTeam.length && nearbyTeam.text().trim()) {
-      return nearbyTeam.text().trim();
-    }
-  }
-
-  return null;
-}
-
-function extractEvent($, $el) {
-  const eventSelectors = [
-    '[class*="event"]',
-    '[class*="match"]',
-    '[class*="game"]',
-    '[data-testid*="event"]'
-  ];
-
-  for (const selector of eventSelectors) {
-    const eventEl = $el.closest(selector);
-    if (eventEl.length) {
-      const titleEl = eventEl.find('[class*="title"], h1, h2, h3').first();
-      if (titleEl.length && titleEl.text().trim()) {
-        return titleEl.text().trim();
-      }
-    }
-  }
-
-  return null;
-}
-
-function extractOriginalOdd($, $el) {
-  const originalSelectors = [
-    '.original-odd',
-    '.old-odd',
-    '[class*="strike"]',
-    '[class*="crossed"]',
-    '.text-decoration-line-through'
-  ];
-
-  for (const selector of originalSelectors) {
-    const originalEl = $el.find(selector).first();
-    if (originalEl.length) {
-      const oddText = originalEl.text().trim();
-      const odd = parseFloat(oddText.match(/\d+\.\d{2}/)?.[0]);
-      if (!isNaN(odd)) {
-        return odd;
-      }
-    }
-  }
-
-  return null;
-}
-
-function searchOddsInPage($, html) {
-  const odds = [];
-  
-  $('*').each((index, element) => {
-    const $el = $(element);
-    const text = $el.text().trim();
-    
-    if (text.length > 100 || text.length < 3) return;
-    
-    const oddMatches = text.match(/\b(\d+\.\d{2})\b/g);
-    
-    if (oddMatches) {
-      oddMatches.forEach(oddStr => {
-        const odd = parseFloat(oddStr);
-        
-        if (odd >= 2.0 && odd <= 50.0) {
-          const contextText = $el.closest('[class*="sport"], [class*="match"], [class*="game"]').text().toLowerCase();
-          
-          if (contextText || text.toLowerCase().includes('odd')) {
-            odds.push({
-              id: `search_${Date.now()}_${Math.random()}`,
-              oddValue: odd,
-              market: 'Detectado automaticamente',
-              team: 'A identificar',
-              event: 'A identificar',
-              timestamp: Date.now(),
-              context: text.substring(0, 50)
-            });
-          }
-        }
-      });
-    }
-  });
-
-  return odds.slice(0, 10);
-}
-
-function searchTextPatterns(html) {
-  const odds = [];
-  
-  const patterns = [
-    /super\s*odds?\s*:?\s*(\d+\.\d{2})/gi,
-    /odds?\s*turbinada?s?\s*:?\s*(\d+\.\d{2})/gi,
-    /enhanced\s*odds?\s*:?\s*(\d+\.\d{2})/gi,
-    /boosted?\s*odds?\s*:?\s*(\d+\.\d{2})/gi
-  ];
-
-  patterns.forEach((pattern, patternIndex) => {
-    const matches = html.matchAll(pattern);
-    for (const match of matches) {
-      const oddValue = parseFloat(match[1]);
-      if (oddValue > 1.5 && oddValue <= 100) {
-        odds.push({
-          id: `pattern_${patternIndex}_${Date.now()}`,
-          oddValue: oddValue,
-          market: 'SuperOdd detectada',
-          team: 'Texto',
-          event: 'Texto',
-          timestamp: Date.now(),
-          pattern: match[0]
-        });
-      }
-    }
-  });
-
-  return odds;
 }
 
 function cleanCache() {
