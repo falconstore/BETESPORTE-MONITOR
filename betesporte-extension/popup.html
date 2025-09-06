@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🦈 SuperOdds Monitor</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <span class="logo-icon">🦈</span>
+        <div class="logo-text">
+          <h1>SuperOdds Monitor</h1>
+          <p>Screenshots automáticos</p>
+        </div>
+      </div>
+    </header>
+
+    <!-- Status -->
+    <div class="status-section">
+      <div class="status-card" id="statusCard">
+        <div class="status-indicator">
+          <div class="status-dot" id="statusDot"></div>
+          <span id="statusText">Carregando...</span>
+        </div>
+        <div class="status-details">
+          <div class="detail">
+            <span class="detail-label">Última verificação:</span>
+            <span class="detail-value" id="lastCheck">--</span>
+          </div>
+          <div class="detail">
+            <span class="detail-label">SuperOdds encontradas:</span>
+            <span class="detail-value" id="oddsCount">--</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Configurações -->
+    <div class="config-section">
+      <h3>⚙️ Configurações</h3>
+      
+      <div class="input-group">
+        <label for="intervalSelect">Intervalo de Screenshots:</label>
+        <select id="intervalSelect">
+          <option value="0.5">30 segundos</option>
+          <option value="1" selected>1 minuto</option>
+          <option value="2">2 minutos</option>
+          <option value="5">5 minutos</option>
+        </select>
+      </div>
+
+      <div class="input-group">
+        <label for="dashboardUrl">URL do seu Dashboard:</label>
+        <input 
+          type="url" 
+          id="dashboardUrl" 
+          placeholder="https://seu-site.vercel.app/api/webhook"
+          title="URL para enviar os dados das SuperOdds"
+        />
+        <small>Cole a URL do webhook do seu dashboard Vercel</small>
+      </div>
+    </div>
+
+    <!-- Controles -->
+    <div class="controls-section">
+      <div class="button-group">
+        <button id="startBtn" class="btn btn-primary">
+          <span class="btn-icon">▶️</span>
+          <span class="btn-text">Iniciar Monitor</span>
+        </button>
+        
+        <button id="stopBtn" class="btn btn-secondary" disabled>
+          <span class="btn-icon">⏹️</span>
+          <span class="btn-text">Parar Monitor</span>
+        </button>
+      </div>
+      
+      <div class="button-group">
+        <button id="checkBtn" class="btn btn-accent">
+          <span class="btn-icon">📸</span>
+          <span class="btn-text">Screenshot Agora</span>
+        </button>
+        
+        <button id="highlightBtn" class="btn btn-outline">
+          <span class="btn-icon">🎯</span>
+          <span class="btn-text">Destacar Odds</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Instruções -->
+    <div class="instructions-section">
+      <details>
+        <summary>📋 Como usar</summary>
+        <div class="instructions">
+          <ol>
+            <li>Abra uma aba do <strong>BETesporte</strong></li>
+            <li>Navegue até a página de <strong>SuperOdds</strong></li>
+            <li>Configure o <strong>intervalo</strong> desejado</li>
+            <li>Cole a <strong>URL do seu dashboard</strong> (opcional)</li>
+            <li>Clique <strong>"Iniciar Monitor"</strong></li>
+            <li>A extensão fará <strong>screenshots automáticos</strong></li>
+          </ol>
+          
+          <div class="tip">
+            <strong>💡 Dica:</strong> Deixe a aba do BETesporte sempre visível para screenshots melhores.
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>🚀 100% Bypass de Bloqueios</p>
+      <div class="footer-links">
+        <a href="#" id="openDashboard">📊 Dashboard</a>
+        <a href="#" id="clearData">🗑️ Limpar Dados</a>
+      </div>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
