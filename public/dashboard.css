@@ -756,3 +756,229 @@ body {
     flex-direction: column;
   }
 }
+
+/* ===== MODO MANUAL STYLES - ADICIONE NO FINAL DO dashboard.css ===== */
+
+.manual-mode-section {
+  margin-bottom: 24px;
+  animation: slideDown 0.3s ease-out;
+}
+
+.manual-mode-section .controls-card {
+  border: 2px solid var(--warning) !important;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), var(--bg-card)) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.manual-mode-section .controls-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--warning), #f59e0b, var(--warning));
+  animation: pulse 2s infinite;
+}
+
+.manual-mode-section h3 {
+  color: var(--warning);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.manual-mode-section textarea {
+  min-height: 200px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  background: var(--bg-primary);
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--text-primary);
+  resize: vertical;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.manual-mode-section textarea:focus {
+  border-color: var(--warning);
+  box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.2);
+  outline: none;
+}
+
+.manual-mode-section textarea::placeholder {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Modal de Instruções */
+.instruction-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.modal-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal-content {
+  background: var(--bg-card);
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  position: relative;
+}
+
+.instruction-steps {
+  margin: 20px 0;
+}
+
+.step {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  border-left: 4px solid var(--primary);
+}
+
+.step-number {
+  background: var(--primary);
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.step-content strong {
+  color: var(--text-primary);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.step-content p {
+  color: var(--text-secondary);
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.step-content code {
+  background: var(--bg-primary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  color: var(--warning);
+  font-size: 12px;
+}
+
+.step-content kbd {
+  background: var(--bg-primary);
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  font-family: monospace;
+  color: var(--text-primary);
+  font-size: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Indicador de Fonte de Dados */
+.odd-source {
+  font-size: 10px;
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
+/* Animações */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+  .modal-content {
+    margin: 20px 10px;
+    padding: 20px;
+  }
+  
+  .step {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .step-number {
+    align-self: center;
+  }
+  
+  .manual-mode-section textarea {
+    font-size: 11px;
+    min-height: 150px;
+  }
+}
+
+@media (max-width: 480px) {
+  .instruction-steps {
+    margin: 16px 0;
+  }
+  
+  .step {
+    margin-bottom: 16px;
+    padding: 12px;
+  }
+  
+  .modal-content {
+    padding: 16px;
+  }
+}
