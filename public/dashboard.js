@@ -19,6 +19,26 @@ class BetEsporteDashboard {
     this.bindEvents();
     this.updateStatus('Conectado', 'online');
     this.addLog('Dashboard inicializado com sucesso', 'success');
+
+toggleManualMode() {
+  if (this.manualModeEnabled) {
+    this.disableManualMode();
+    this.addLog('❌ Modo manual desativado pelo usuário', 'info');
+  } else {
+    // Para monitoramento se estiver ativo
+    if (this.isMonitoring) {
+      this.stopMonitoring();
+    }
+    
+    this.enableManualMode();
+    this.addLog('📝 Modo manual ativado pelo usuário', 'success');
+    this.showNotification(
+      'Modo Manual Ativo', 
+      'Cole o HTML da página do BETesporte na área abaixo.', 
+      'info'
+    );
+  }
+}
     
     // Primeira verificação
     setTimeout(() => this.fetchSuperOdds(), 1000);
@@ -47,6 +67,10 @@ class BetEsporteDashboard {
     document.getElementById('forceUpdateBtn').addEventListener('click', () => {
       this.fetchSuperOdds(true);
     });
+
+    document.getElementById('manualModeBtn').addEventListener('click', () => {
+    this.toggleManualMode();
+  });
 
     // Interval change
     document.getElementById('intervalSelect').addEventListener('change', (e) => {
