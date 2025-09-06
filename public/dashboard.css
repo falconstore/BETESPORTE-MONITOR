@@ -982,3 +982,219 @@ body {
     padding: 16px;
   }
 }
+
+/* ===== MODO HTML BASE STYLES - ADICIONE NO FINAL DO dashboard.css ===== */
+
+.html-base-section {
+  margin-bottom: 24px;
+  animation: slideDown 0.3s ease-out;
+}
+
+.html-base-section .controls-card {
+  border: 2px solid var(--accent) !important;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), var(--bg-card)) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.html-base-section .controls-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--accent), #a855f7, var(--accent));
+  animation: pulse 2s infinite;
+}
+
+.html-base-section h3 {
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.html-base-steps {
+  margin: 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.step-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  border-left: 4px solid var(--accent);
+  transition: all 0.2s ease;
+}
+
+.step-card:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
+}
+
+.step-number {
+  background: var(--accent);
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.step-content {
+  flex: 1;
+}
+
+.step-content strong {
+  color: var(--text-primary);
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.html-base-section textarea {
+  width: 100%;
+  min-height: 120px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  background: var(--bg-primary);
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--text-primary);
+  resize: vertical;
+  transition: all 0.2s ease;
+}
+
+.html-base-section textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+  outline: none;
+}
+
+.html-base-section textarea::placeholder {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.html-base-section select {
+  width: 100%;
+  padding: 8px;
+  background: var(--bg-primary);
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.html-base-section select:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.html-base-info {
+  background: var(--bg-secondary) !important;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.html-base-info strong {
+  color: var(--accent);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.html-base-info div:not([style*="display: grid"]) {
+  color: var(--text-secondary);
+  font-family: ui-monospace, monospace;
+}
+
+/* Status específicos */
+#htmlBaseStatus {
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+#htmlBaseStatus:contains("Ativo") {
+  background: linear-gradient(135deg, var(--success), #16a34a) !important;
+  color: white;
+}
+
+#htmlBaseStatus:contains("Erro") {
+  background: linear-gradient(135deg, var(--danger), #dc2626) !important;
+  color: white;
+}
+
+#htmlBaseStatus:contains("Testando") {
+  background: linear-gradient(135deg, var(--warning), #f59e0b) !important;
+  color: white;
+}
+
+/* Botões específicos */
+.html-base-section .btn {
+  font-size: 13px;
+  padding: 10px 16px;
+}
+
+.html-base-section .btn-primary {
+  background: linear-gradient(135deg, var(--accent), #a855f7);
+}
+
+.html-base-section .btn-accent {
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+}
+
+/* Responsive para modo HTML base */
+@media (max-width: 768px) {
+  .html-base-steps {
+    gap: 12px;
+  }
+  
+  .step-card {
+    flex-direction: column;
+    text-align: center;
+    padding: 12px;
+  }
+  
+  .step-number {
+    align-self: center;
+  }
+  
+  .html-base-section textarea {
+    min-height: 100px;
+    font-size: 10px;
+  }
+  
+  .html-base-info div[style*="display: grid"] {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
+}
+
+/* Animação para status ativo */
+@keyframes statusPulse {
+  0%, 100% { 
+    box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.7);
+  }
+  50% { 
+    box-shadow: 0 0 0 8px rgba(139, 92, 246, 0);
+  }
+}
+
+#htmlBaseStatus:contains("Ativo") {
+  animation: statusPulse 2s infinite;
+}
