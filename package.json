@@ -1,0 +1,28 @@
+
+{
+  "name": "betesporte-monitor",
+  "version": "1.0.0",
+  "description": "Sistema de monitoramento de SuperOdds do BETesporte com dashboard web",
+  "main": "api/superodds.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'Build completed'",
+    "start": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.12",
+    "cors": "^2.8.5",
+    "node-fetch": "^2.6.7"
+  },
+  "devDependencies": {
+    "vercel": "^32.0.0"
+  },
+  "keywords": ["betesporte", "superodds", "monitor", "dashboard", "vercel"],
+  "author": "Shark Green",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SEU-USUARIO/betesporte-monitor.git"
+  }
+}
