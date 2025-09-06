@@ -7,7 +7,13 @@ class BetEsporteDashboard {
     this.theme = 'dark';
     this.filter = 'all';
     this.todayStats = { total: 0, updates: 0 };
-    this.manualModeEnabled = false; // NOVA PROPRIEDADE
+    this.manualModeEnabled = false;
+    
+    // NOVAS PROPRIEDADES HTML BASE
+    this.htmlBaseMode = false;
+    this.savedHtmlBase = null;
+    this.htmlUpdateInterval = null;
+    this.lastOddsSignature = null;
     
     this.init();
   }
@@ -16,29 +22,10 @@ class BetEsporteDashboard {
     console.log('🦈 Dashboard inicializando...');
     
     this.loadSettings();
+    this.loadSavedHtmlBase();
     this.bindEvents();
     this.updateStatus('Conectado', 'online');
     this.addLog('Dashboard inicializado com sucesso', 'success');
-
-toggleManualMode() {
-  if (this.manualModeEnabled) {
-    this.disableManualMode();
-    this.addLog('❌ Modo manual desativado pelo usuário', 'info');
-  } else {
-    // Para monitoramento se estiver ativo
-    if (this.isMonitoring) {
-      this.stopMonitoring();
-    }
-    
-    this.enableManualMode();
-    this.addLog('📝 Modo manual ativado pelo usuário', 'success');
-    this.showNotification(
-      'Modo Manual Ativo', 
-      'Cole o HTML da página do BETesporte na área abaixo.', 
-      'info'
-    );
-  }
-}
     
     // Primeira verificação
     setTimeout(() => this.fetchSuperOdds(), 1000);
@@ -68,9 +55,15 @@ toggleManualMode() {
       this.fetchSuperOdds(true);
     });
 
+    // Manual mode button
     document.getElementById('manualModeBtn').addEventListener('click', () => {
-    this.toggleManualMode();
-  });
+      this.toggleManualMode();
+    });
+
+    // HTML BASE MODE BUTTON
+    document.getElementById('htmlBaseModeBtn').addEventListener('click', () => {
+      this.enableHtmlBaseMode();
+    });
 
     // Interval change
     document.getElementById('intervalSelect').addEventListener('change', (e) => {
@@ -108,187 +101,162 @@ toggleManualMode() {
   }
 
   async startMonitoring() {
-  if (this.isMonitoring) {
-    console.log('⚠️ Monitoramento já está ativo');
-    return;
-  }
-  
-  console.log('▶️ Iniciando monitoramento...');
-  
-  // Remove modo manual se estava ativo
-  this.disableManualMode();
-  
-  this.isMonitoring = true;
-  this.addLog(`▶️ Monitoramento iniciado (intervalo: ${this.interval/1000}s)`, 'success');
-  this.updateStatus('Monitorando...', 'online');
-  
-  // Atualiza UI dos botões IMEDIATAMENTE
-  document.getElementById('startBtn').style.opacity = '0.5';
-  document.getElementById('startBtn').disabled = true;
-  document.getElementById('stopBtn').style.opacity = '1';
-  document.getElementById('stopBtn').disabled = false;
-  
-  // Primeira verificação imediata
-  await this.fetchSuperOdds();
-  
-  // Só inicia o interval se ainda está monitorando (pode ter parado durante o fetchSuperOdds)
-  if (this.isMonitoring) {
+    if (this.isMonitoring) return;
+    
+    // Desativa outros modos
+    this.disableManualMode();
+    this.disableHtmlBaseMode();
+    
+    this.isMonitoring = true;
+    this.addLog(`Monitoramento iniciado (intervalo: ${this.interval/1000}s)`, 'success');
+    this.updateStatus('Monitorando...', 'online');
+    
+    // Primeira verificação imediata
+    await this.fetchSuperOdds();
+    
+    // Inicia verificações periódicas
     this.intervalId = setInterval(() => {
-      // Verifica se ainda deve estar monitorando
-      if (this.isMonitoring) {
-        this.fetchSuperOdds();
-      } else {
-        // Para o interval se não deveria estar rodando
-        clearInterval(this.intervalId);
-        this.intervalId = null;
-      }
+      this.fetchSuperOdds();
     }, this.interval);
     
-    console.log('✅ Monitoramento ativo com interval:', this.intervalId);
+    // Atualiza UI
+    document.getElementById('startBtn').style.opacity = '0.5';
+    document.getElementById('stopBtn').style.opacity = '1';
   }
-}
 
   stopMonitoring() {
-  if (!this.isMonitoring) return;
-  
-  console.log('🛑 Parando monitoramento...');
-  
-  // Para o monitoramento
-  this.isMonitoring = false;
-  
-  // Limpa interval se existir
-  if (this.intervalId) {
-    clearInterval(this.intervalId);
-    this.intervalId = null;
-    console.log('✅ Interval cleared');
-  }
-  
-  // Atualiza status
-  this.addLog('🛑 Monitoramento parado pelo usuário', 'warning');
-  this.updateStatus('Parado', 'warning');
-  
-  // Atualiza UI dos botões
-  document.getElementById('startBtn').style.opacity = '1';
-  document.getElementById('startBtn').disabled = false;
-  document.getElementById('stopBtn').style.opacity = '0.5';
-  document.getElementById('stopBtn').disabled = true;
-  
-  // FORÇA ativação do modo manual se estava com erro
-  setTimeout(() => {
-    if (!this.manualModeEnabled) {
-      this.enableManualMode();
-      this.addLog('📝 Modo manual ativado - monitoramento parado', 'info');
-      this.showNotification(
-        'Monitoramento Parado', 
-        'Modo manual ativado. Cole o HTML para continuar monitorando.', 
-        'info'
-      );
+    if (!this.isMonitoring) return;
+    
+    console.log('🛑 Parando monitoramento...');
+    
+    this.isMonitoring = false;
+    
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+      console.log('✅ Interval cleared');
     }
-  }, 500);
-  
-  console.log('🛑 Monitoramento parado completamente');
-}
+    
+    this.addLog('🛑 Monitoramento parado pelo usuário', 'warning');
+    this.updateStatus('Parado', 'warning');
+    
+    // Atualiza UI dos botões
+    document.getElementById('startBtn').style.opacity = '1';
+    document.getElementById('startBtn').disabled = false;
+    document.getElementById('stopBtn').style.opacity = '0.5';
+    document.getElementById('stopBtn').disabled = true;
+    
+    // FORÇA ativação do modo manual se estava com erro
+    setTimeout(() => {
+      if (!this.manualModeEnabled && !this.htmlBaseMode) {
+        this.enableManualMode();
+        this.addLog('📝 Modo manual ativado - monitoramento parado', 'info');
+        this.showNotification(
+          'Monitoramento Parado', 
+          'Modo manual ativado. Cole o HTML para continuar monitorando.', 
+          'info'
+        );
+      }
+    }, 500);
+    
+    console.log('🛑 Monitoramento parado completamente');
+  }
 
-  // MÉTODO ATUALIZADO COM DETECÇÃO DE ERRO 403
   async fetchSuperOdds(force = false) {
-  try {
-    this.showLoading(true);
-    
-    const customUrl = document.getElementById('urlInput').value.trim();
-    let apiUrl = '/api/superodds';
-    
-    if (customUrl) {
-      apiUrl += `?url=${encodeURIComponent(customUrl)}`;
-    }
-    
-    if (force) {
-      apiUrl += (customUrl ? '&' : '?') + 'force=1';
-    }
-    
-    console.log('🔍 Buscando SuperOdds:', apiUrl);
-    
-    const response = await fetch(apiUrl);
-    const data = await response.json();
-    
-    if (data.success) {
-      this.handleSuperOddsData(data);
-      this.updateStatus('Online', 'online');
-      
-      // Log informações de estratégia usada
-      if (data.fetchMethod) {
-        this.addLog(`✅ Conectado via: ${data.fetchMethod}`, 'success');
-      }
-      
-      // Remove modo manual se estava ativo
-      this.disableManualMode();
-    } else {
-      throw new Error(data.error || 'Erro desconhecido');
-    }
-    
-  } catch (error) {
-    console.error('❌ Erro ao buscar SuperOdds:', error);
-    
-    // Parse da resposta de erro se disponível
-    let errorData = null;
     try {
-      const response = await fetch('/api/superodds');
-      if (!response.ok) {
-        errorData = await response.json();
+      this.showLoading(true);
+      
+      const customUrl = document.getElementById('urlInput').value.trim();
+      let apiUrl = '/api/superodds';
+      
+      if (customUrl) {
+        apiUrl += `?url=${encodeURIComponent(customUrl)}`;
       }
-    } catch (e) {
-      // Ignora erro de parse
+      
+      if (force) {
+        apiUrl += (customUrl ? '&' : '?') + 'force=1';
+      }
+      
+      console.log('🔍 Buscando SuperOdds:', apiUrl);
+      
+      const response = await fetch(apiUrl);
+      const data = await response.json();
+      
+      if (data.success) {
+        this.handleSuperOddsData(data);
+        this.updateStatus('Online', 'online');
+        
+        if (data.fetchMethod) {
+          this.addLog(`✅ Conectado via: ${data.fetchMethod}`, 'success');
+        }
+        
+        // Remove modo manual se estava ativo
+        this.disableManualMode();
+      } else {
+        throw new Error(data.error || 'Erro desconhecido');
+      }
+      
+    } catch (error) {
+      console.error('❌ Erro ao buscar SuperOdds:', error);
+      
+      let errorData = null;
+      try {
+        const response = await fetch('/api/superodds');
+        if (!response.ok) {
+          errorData = await response.json();
+        }
+      } catch (e) {
+        // Ignora erro de parse
+      }
+      
+      this.addLog(`❌ Erro: ${error.message}`, 'error');
+      this.updateStatus('Erro', 'error');
+      
+      // Verifica se é erro de bloqueio
+      const isBlocked = error.message.includes('403') || 
+                       error.message.includes('Forbidden') || 
+                       error.message.includes('bloqueado') ||
+                       error.message.includes('blocked') ||
+                       error.message.includes('Site pode estar bloqueando') ||
+                       (errorData && errorData.block_detected);
+      
+      if (isBlocked) {
+        this.enableManualMode();
+        
+        const suggestions = errorData?.suggestions || [
+          'Site bloqueando requisições automáticas',
+          'Use o modo manual para continuar',
+          'Tente uma VPN se o problema persistir'
+        ];
+        
+        this.addLog('🚫 Site bloqueando requisições - Modo manual ativo', 'warning');
+        
+        this.showNotification(
+          'API Bloqueada', 
+          'Todas as estratégias falharam. Modo manual ativado automaticamente.', 
+          'warning'
+        );
+        
+        suggestions.forEach(suggestion => {
+          this.addLog(`💡 ${suggestion}`, 'info');
+        });
+        
+      } else {
+        this.showNotification('Erro de Conexão', error.message, 'error');
+        this.addLog('💡 Tente: Aguardar alguns minutos e tentar novamente', 'info');
+        this.addLog('💡 Verificar conexão com a internet', 'info');
+      }
+    } finally {
+      this.showLoading(false);
     }
-    
-    this.addLog(`❌ Erro: ${error.message}`, 'error');
-    this.updateStatus('Erro', 'error');
-    
-    // Verifica se é erro de bloqueio
-    const isBlocked = error.message.includes('403') || 
-                     error.message.includes('Forbidden') || 
-                     error.message.includes('bloqueado') ||
-                     error.message.includes('blocked') ||
-                     error.message.includes('Site pode estar bloqueando') ||
-                     (errorData && errorData.block_detected);
-    
-    if (isBlocked) {
-      this.enableManualMode();
-      
-      // Mostra sugestões específicas
-      const suggestions = errorData?.suggestions || [
-        'Site bloqueando requisições automáticas',
-        'Use o modo manual para continuar',
-        'Tente uma VPN se o problema persistir'
-      ];
-      
-      this.addLog('🚫 Site bloqueando requisições - Modo manual ativo', 'warning');
-      
-      this.showNotification(
-        'API Bloqueada', 
-        'Todas as estratégias falharam. Modo manual ativado automaticamente.', 
-        'warning'
-      );
-      
-      // Adiciona sugestões no log
-      suggestions.forEach(suggestion => {
-        this.addLog(`💡 ${suggestion}`, 'info');
-      });
-      
-    } else {
-      // Outros tipos de erro
-      this.showNotification('Erro de Conexão', error.message, 'error');
-      
-      // Sugestões genéricas
-      this.addLog('💡 Tente: Aguardar alguns minutos e tentar novamente', 'info');
-      this.addLog('💡 Verificar conexão com a internet', 'info');
-    }
-  } finally {
-    this.showLoading(false);
   }
-}
 
-  // NOVA FUNÇÃO: Ativa modo manual
+  // ===== MODO MANUAL =====
   enableManualMode() {
     if (this.manualModeEnabled) return;
+    
+    // Desativa outros modos
+    this.disableHtmlBaseMode();
     
     this.manualModeEnabled = true;
     
@@ -320,11 +288,9 @@ toggleManualMode() {
       </div>
     `;
     
-    // Insere após a seção de controles
     const controlsSection = document.querySelector('.controls-section');
     controlsSection.after(manualSection);
     
-    // Event listeners
     document.getElementById('processManualBtn').addEventListener('click', () => this.processManualHtml());
     document.getElementById('getInstructionsBtn').addEventListener('click', () => this.showInstructions());
     document.getElementById('disableManualBtn').addEventListener('click', () => this.disableManualMode());
@@ -332,7 +298,6 @@ toggleManualMode() {
     this.addLog('📝 Modo manual ativado - API bloqueada', 'warning');
   }
 
-  // NOVA FUNÇÃO: Desativa modo manual
   disableManualMode() {
     const manualSection = document.getElementById('manualModeSection');
     if (manualSection) {
@@ -342,77 +307,91 @@ toggleManualMode() {
     }
   }
 
-  // NOVA FUNÇÃO: Processa HTML manual
   async processManualHtml() {
-  const html = document.getElementById('manualHtml').value.trim();
-  
-  if (!html) {
-    this.showNotification('Erro', 'Cole o HTML da página primeiro', 'error');
-    return;
-  }
-  
-  if (html.length < 1000) {
-    this.showNotification('Aviso', 'HTML parece muito pequeno. Certifique-se de copiar a página completa.', 'warning');
-  }
-  
-  try {
-    this.showLoading(true);
-    this.addLog('📝 Enviando HTML para processamento...', 'info');
+    const html = document.getElementById('manualHtml').value.trim();
     
-    // Envia HTML para processamento
-    const response = await fetch('/api/parse-html', {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({ html: html })
-    });
-    
-    console.log('Response status:', response.status);
-    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-    
-    // Verifica se a resposta é JSON
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      const textResponse = await response.text();
-      console.error('Resposta não é JSON:', textResponse);
-      throw new Error('API retornou HTML ao invés de JSON. Verifique se o arquivo api/parse-html.js existe.');
+    if (!html) {
+      this.showNotification('Erro', 'Cole o HTML da página primeiro', 'error');
+      return;
     }
     
-    const data = await response.json();
+    if (html.length < 1000) {
+      this.showNotification('Aviso', 'HTML parece muito pequeno. Certifique-se de copiar a página completa.', 'warning');
+    }
     
-    if (data.success) {
-      this.handleSuperOddsData(data);
-      this.updateStatus('Manual', 'online');
-      this.addLog(`✅ HTML processado: ${data.totalOdds} SuperOdds encontradas`, 'success');
-      this.showNotification('Sucesso!', `${data.totalOdds} SuperOdds processadas do HTML`, 'success');
+    try {
+      this.showLoading(true);
+      this.addLog('📝 Enviando HTML para processamento...', 'info');
       
-      // Limpa o textarea
-      document.getElementById('manualHtml').value = '';
-    } else {
-      throw new Error(data.error || 'Erro ao processar HTML');
+      const response = await fetch('/api/parse-html', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ html: html })
+      });
+      
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+      
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const textResponse = await response.text();
+        console.error('Resposta não é JSON:', textResponse);
+        throw new Error('API retornou HTML ao invés de JSON. Verifique se o arquivo api/parse-html.js existe.');
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        this.handleSuperOddsData(data);
+        this.updateStatus('Manual', 'online');
+        this.addLog(`✅ HTML processado: ${data.totalOdds} SuperOdds encontradas`, 'success');
+        this.showNotification('Sucesso!', `${data.totalOdds} SuperOdds processadas do HTML`, 'success');
+        
+        document.getElementById('manualHtml').value = '';
+      } else {
+        throw new Error(data.error || 'Erro ao processar HTML');
+      }
+      
+    } catch (error) {
+      console.error('Erro completo:', error);
+      this.addLog(`❌ Erro no modo manual: ${error.message}`, 'error');
+      
+      if (error.message.includes('JSON') || error.message.includes('HTML ao invés')) {
+        this.showNotification(
+          'Arquivo API Ausente', 
+          'O arquivo api/parse-html.js não foi criado. Verifique se fez o deploy corretamente.', 
+          'error'
+        );
+      } else {
+        this.showNotification('Erro', error.message, 'error');
+      }
+    } finally {
+      this.showLoading(false);
     }
-    
-  } catch (error) {
-    console.error('Erro completo:', error);
-    this.addLog(`❌ Erro no modo manual: ${error.message}`, 'error');
-    
-    // Erro específico se API não existe
-    if (error.message.includes('JSON') || error.message.includes('HTML ao invés')) {
-      this.showNotification(
-        'Arquivo API Ausente', 
-        'O arquivo api/parse-html.js não foi criado. Verifique se fez o deploy corretamente.', 
-        'error'
-      );
-    } else {
-      this.showNotification('Erro', error.message, 'error');
-    }
-  } finally {
-    this.showLoading(false);
   }
-}
-  // NOVA FUNÇÃO: Mostra instruções
+
+  toggleManualMode() {
+    if (this.manualModeEnabled) {
+      this.disableManualMode();
+      this.addLog('❌ Modo manual desativado pelo usuário', 'info');
+    } else {
+      if (this.isMonitoring) {
+        this.stopMonitoring();
+      }
+      
+      this.enableManualMode();
+      this.addLog('📝 Modo manual ativado pelo usuário', 'success');
+      this.showNotification(
+        'Modo Manual Ativo', 
+        'Cole o HTML da página do BETesporte na área abaixo.', 
+        'info'
+      );
+    }
+  }
+
   showInstructions() {
     const modal = document.createElement('div');
     modal.className = 'instruction-modal';
@@ -478,6 +457,300 @@ toggleManualMode() {
     document.body.appendChild(modal);
   }
 
+  // ===== MODO HTML BASE =====
+  enableHtmlBaseMode() {
+    this.htmlBaseMode = true;
+    
+    // Para outros modos se ativos
+    if (this.isMonitoring) {
+      this.stopMonitoring();
+    }
+    this.disableManualMode();
+    
+    this.showHtmlBaseSection();
+    
+    this.addLog('💾 Modo HTML Base ativado', 'success');
+    this.updateStatus('HTML Base Mode', 'online');
+  }
+
+  showHtmlBaseSection() {
+    const existing = document.getElementById('htmlBaseSection');
+    if (existing) existing.remove();
+    
+    const htmlBaseSection = document.createElement('div');
+    htmlBaseSection.id = 'htmlBaseSection';
+    htmlBaseSection.className = 'html-base-section';
+    htmlBaseSection.innerHTML = `
+      <div class="controls-card" style="border: 2px solid #8b5cf6; background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), var(--bg-card));">
+        <h3>💾 Modo HTML Base + Auto-Update</h3>
+        <p style="color: var(--accent); margin-bottom: 16px;">
+          🚀 Salve o HTML uma vez e monitore só as SuperOdds automaticamente!
+        </p>
+        
+        <div class="html-base-steps">
+          <div class="step-card">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <strong>Cole o HTML Base:</strong>
+              <textarea 
+                id="htmlBaseInput" 
+                rows="6" 
+                placeholder="Cole aqui o HTML copiado do BETesporte..."
+                style="font-family: monospace; font-size: 11px; margin-top: 8px;"
+              ></textarea>
+            </div>
+          </div>
+          
+          <div class="step-card">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <strong>Configure Auto-Update:</strong>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;">
+                <select id="htmlUpdateInterval">
+                  <option value="30">30 segundos</option>
+                  <option value="60" selected>1 minuto</option>
+                  <option value="120">2 minutos</option>
+                  <option value="300">5 minutos</option>
+                </select>
+                
+                <div id="htmlBaseStatus" style="padding: 8px; background: var(--bg-secondary); border-radius: 4px; text-align: center; font-size: 12px;">
+                  Aguardando...
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="control-buttons">
+          <button id="saveHtmlBaseBtn" class="btn btn-primary">💾 Salvar HTML Base</button>
+          <button id="startHtmlUpdateBtn" class="btn btn-accent" disabled>🔄 Iniciar Auto-Update</button>
+          <button id="stopHtmlUpdateBtn" class="btn btn-secondary" disabled>⏹️ Parar Auto-Update</button>
+          <button id="testHtmlBaseBtn" class="btn btn-outline" disabled>🧪 Testar Agora</button>
+        </div>
+        
+        <div class="html-base-info" style="margin-top: 16px; padding: 12px; background: var(--bg-secondary); border-radius: 8px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; font-size: 12px;">
+            <div>
+              <strong>HTML Salvo:</strong>
+              <div id="htmlSizeInfo">--</div>
+            </div>
+            <div>
+              <strong>Última Verificação:</strong>
+              <div id="lastHtmlCheck">--</div>
+            </div>
+            <div>
+              <strong>SuperOdds Detectadas:</strong>
+              <div id="htmlOddsCount">--</div>
+            </div>
+          </div>
+        </div>
+        
+        <button id="disableHtmlBaseBtn" class="btn btn-small" style="margin-top: 12px;">❌ Desativar Modo</button>
+      </div>
+    `;
+    
+    const controlsSection = document.querySelector('.controls-section');
+    controlsSection.after(htmlBaseSection);
+    
+    // Event listeners
+    document.getElementById('saveHtmlBaseBtn').addEventListener('click', () => this.saveHtmlBase());
+    document.getElementById('startHtmlUpdateBtn').addEventListener('click', () => this.startHtmlAutoUpdate());
+    document.getElementById('stopHtmlUpdateBtn').addEventListener('click', () => this.stopHtmlAutoUpdate());
+    document.getElementById('testHtmlBaseBtn').addEventListener('click', () => this.testHtmlBase());
+    document.getElementById('disableHtmlBaseBtn').addEventListener('click', () => this.disableHtmlBaseMode());
+  }
+
+  async saveHtmlBase() {
+    const html = document.getElementById('htmlBaseInput').value.trim();
+    
+    if (!html) {
+      this.showNotification('Erro', 'Cole o HTML da página primeiro', 'error');
+      return;
+    }
+    
+    if (html.length < 1000) {
+      this.showNotification('Aviso', 'HTML parece muito pequeno. Certifique-se de copiar a página completa.', 'warning');
+    }
+    
+    try {
+      this.savedHtmlBase = html;
+      
+      localStorage.setItem('betesporte_html_base', html);
+      localStorage.setItem('betesporte_html_base_timestamp', Date.now());
+      
+      document.getElementById('htmlSizeInfo').textContent = `${Math.round(html.length / 1024)}KB`;
+      document.getElementById('startHtmlUpdateBtn').disabled = false;
+      document.getElementById('testHtmlBaseBtn').disabled = false;
+      
+      await this.testHtmlBase();
+      
+      this.addLog('💾 HTML base salvo com sucesso', 'success');
+      this.showNotification('HTML Salvo!', 'Base HTML salva. Agora pode iniciar auto-update.', 'success');
+      
+    } catch (error) {
+      this.addLog(`❌ Erro ao salvar HTML: ${error.message}`, 'error');
+      this.showNotification('Erro', error.message, 'error');
+    }
+  }
+
+  startHtmlAutoUpdate() {
+    if (!this.savedHtmlBase) {
+      this.showNotification('Erro', 'Salve o HTML base primeiro', 'error');
+      return;
+    }
+    
+    const interval = parseInt(document.getElementById('htmlUpdateInterval').value) * 1000;
+    
+    this.addLog(`🔄 Auto-update iniciado (${interval/1000}s)`, 'success');
+    this.updateHtmlBaseStatus('🔄 Ativo');
+    
+    this.processHtmlBase();
+    
+    this.htmlUpdateInterval = setInterval(() => {
+      this.processHtmlBase();
+    }, interval);
+    
+    document.getElementById('startHtmlUpdateBtn').disabled = true;
+    document.getElementById('stopHtmlUpdateBtn').disabled = false;
+  }
+
+  stopHtmlAutoUpdate() {
+    if (this.htmlUpdateInterval) {
+      clearInterval(this.htmlUpdateInterval);
+      this.htmlUpdateInterval = null;
+    }
+    
+    this.addLog('⏹️ Auto-update parado', 'warning');
+    this.updateHtmlBaseStatus('⏹️ Parado');
+    
+    document.getElementById('startHtmlUpdateBtn').disabled = false;
+    document.getElementById('stopHtmlUpdateBtn').disabled = true;
+  }
+
+  async testHtmlBase() {
+    if (!this.savedHtmlBase) {
+      this.showNotification('Erro', 'Nenhum HTML base salvo', 'error');
+      return;
+    }
+    
+    await this.processHtmlBase(true);
+  }
+
+  async processHtmlBase(isTest = false) {
+    try {
+      if (isTest) {
+        this.updateHtmlBaseStatus('🧪 Testando...');
+      } else {
+        this.updateHtmlBaseStatus('🔍 Verificando...');
+      }
+      
+      const response = await fetch('/api/parse-html', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ html: this.savedHtmlBase })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        const currentOddsSignature = this.generateOddsSignature(data.odds);
+        const hasChanges = !this.lastOddsSignature || this.lastOddsSignature !== currentOddsSignature;
+        
+        if (hasChanges) {
+          this.lastOddsSignature = currentOddsSignature;
+          
+          this.handleSuperOddsData(data);
+          this.addLog(`💾 HTML processado: ${data.totalOdds} SuperOdds${hasChanges ? ' (MUDANÇAS!)' : ''}`, 'success');
+          
+          if (!isTest) {
+            this.showNotification('SuperOdds Atualizadas!', `${data.totalOdds} odds do HTML base`, 'success');
+          }
+        } else if (isTest) {
+          this.addLog(`🧪 Teste OK: ${data.totalOdds} SuperOdds (sem mudanças)`, 'info');
+        }
+        
+        document.getElementById('htmlOddsCount').textContent = data.totalOdds;
+        document.getElementById('lastHtmlCheck').textContent = new Date().toLocaleTimeString();
+        
+        if (isTest) {
+          this.updateHtmlBaseStatus('✅ Teste OK');
+          setTimeout(() => {
+            if (!this.htmlUpdateInterval) {
+              this.updateHtmlBaseStatus('⏹️ Parado');
+            }
+          }, 2000);
+        } else {
+          this.updateHtmlBaseStatus('✅ Ativo');
+        }
+        
+      } else {
+        throw new Error(data.error || 'Erro ao processar HTML base');
+      }
+      
+    } catch (error) {
+      this.addLog(`❌ Erro no HTML base: ${error.message}`, 'error');
+      this.updateHtmlBaseStatus('❌ Erro');
+      
+      if (isTest) {
+        this.showNotification('Erro no Teste', error.message, 'error');
+      }
+    }
+  }
+
+  generateOddsSignature(odds) {
+    if (!odds || odds.length === 0) return 'empty';
+    
+    const signature = odds
+      .map(odd => `${odd.oddValue}_${odd.market}_${odd.team}`)
+      .sort()
+      .join('|');
+      
+    return btoa(signature).substring(0, 20);
+  }
+
+  updateHtmlBaseStatus(status) {
+    const statusEl = document.getElementById('htmlBaseStatus');
+    if (statusEl) {
+      statusEl.textContent = status;
+    }
+  }
+
+  disableHtmlBaseMode() {
+    this.htmlBaseMode = false;
+    this.stopHtmlAutoUpdate();
+    
+    const section = document.getElementById('htmlBaseSection');
+    if (section) section.remove();
+    
+    this.addLog('❌ Modo HTML Base desativado', 'info');
+    this.updateStatus('Parado', 'warning');
+  }
+
+  async loadSavedHtmlBase() {
+    try {
+      const savedHtml = localStorage.getItem('betesporte_html_base');
+      const timestamp = localStorage.getItem('betesporte_html_base_timestamp');
+      
+      if (savedHtml && timestamp) {
+        const age = Date.now() - parseInt(timestamp);
+        const ageHours = age / (1000 * 60 * 60);
+        
+        if (ageHours < 24) {
+          this.savedHtmlBase = savedHtml;
+          this.addLog(`💾 HTML base carregado (${ageHours.toFixed(1)}h atrás)`, 'info');
+          return true;
+        } else {
+          this.addLog('⚠️ HTML base expirado (>24h), salve um novo', 'warning');
+        }
+      }
+    } catch (error) {
+      console.warn('Erro ao carregar HTML base:', error);
+    }
+    
+    return false;
+  }
+
+  // ===== RESTO DOS MÉTODOS ORIGINAIS =====
   handleSuperOddsData(data) {
     const hasChanges = this.detectChanges(data);
     
@@ -630,12 +903,10 @@ toggleManualMode() {
   setFilter(filter) {
     this.filter = filter;
     
-    // Atualiza botões
     document.querySelectorAll('.filter-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.filter === filter);
     });
     
-    // Reaplica filtro se temos dados
     if (this.lastData && this.lastData.odds) {
       this.updateOddsDisplay(this.lastData.odds);
     }
@@ -656,7 +927,6 @@ toggleManualMode() {
     
     container.insertBefore(logEntry, container.firstChild);
     
-    // Mantém apenas os últimos 50 logs
     while (container.children.length > 50) {
       container.removeChild(container.lastChild);
     }
@@ -673,7 +943,6 @@ toggleManualMode() {
   }
 
   showNotification(title, message, type = 'info') {
-    // Notificação do navegador
     if ('Notification' in window && Notification.permission === 'granted') {
       new Notification(`🦈 ${title}`, {
         body: message,
@@ -681,7 +950,6 @@ toggleManualMode() {
       });
     }
     
-    // Notificação na página
     const container = document.getElementById('notificationContainer');
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
@@ -693,14 +961,12 @@ toggleManualMode() {
       <div class="notification-message">${message}</div>
     `;
     
-    // Event listener para fechar
     notification.querySelector('.notification-close').addEventListener('click', () => {
       notification.remove();
     });
     
     container.appendChild(notification);
     
-    // Remove automaticamente após 5 segundos
     setTimeout(() => {
       if (notification.parentNode) {
         notification.remove();
@@ -737,12 +1003,10 @@ toggleManualMode() {
         this.filter = settings.filter || 'all';
         this.todayStats = settings.todayStats || { total: 0, updates: 0 };
         
-        // Aplica configurações na UI
         document.body.setAttribute('data-theme', this.theme);
         document.getElementById('themeToggle').textContent = this.theme === 'dark' ? '🌙' : '☀️';
         document.getElementById('intervalSelect').value = this.interval;
         
-        // Reseta stats se for um novo dia
         const today = new Date().toDateString();
         const lastDate = localStorage.getItem('betesporte_last_date');
         
@@ -756,7 +1020,6 @@ toggleManualMode() {
     }
   }
 
-  // Método para exportar dados
   exportData() {
     const data = {
       lastData: this.lastData,
