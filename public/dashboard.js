@@ -277,49 +277,74 @@ class BetEsporteDashboard {
 
   // NOVA FUNÇÃO: Processa HTML manual
   async processManualHtml() {
-    const html = document.getElementById('manualHtml').value.trim();
-    
-    if (!html) {
-      this.showNotification('Erro', 'Cole o HTML da página primeiro', 'error');
-      return;
-    }
-    
-    if (html.length < 1000) {
-      this.showNotification('Aviso', 'HTML parece muito pequeno. Certifique-se de copiar a página completa.', 'warning');
-    }
-    
-    try {
-      this.showLoading(true);
-      
-      // Envia HTML para processamento
-      const response = await fetch('/api/parse-html', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ html: html })
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        this.handleSuperOddsData(data);
-        this.updateStatus('Manual', 'online');
-        this.addLog(`📝 HTML processado: ${data.totalOdds} SuperOdds encontradas`, 'success');
-        this.showNotification('Sucesso!', `${data.totalOdds} SuperOdds processadas do HTML`, 'success');
-        
-        // Limpa o textarea
-        document.getElementById('manualHtml').value = '';
-      } else {
-        throw new Error(data.error || 'Erro ao processar HTML');
-      }
-      
-    } catch (error) {
-      this.addLog(`❌ Erro no modo manual: ${error.message}`, 'error');
-      this.showNotification('Erro', error.message, 'error');
-    } finally {
-      this.showLoading(false);
-    }
+  const html = document.getElementById('manualHtml').value.trim();
+  
+  if (!html) {
+    this.showNotification('Erro', 'Cole o HTML da página primeiro', 'error');
+    return;
   }
-
+  
+  if (html.length < 1000) {
+    this.showNotification('Aviso', 'HTML parece muito pequeno. Certifique-se de copiar a página completa.', 'warning');
+  }
+  
+  try {
+    this.showLoading(true);
+    this.addLog('📝 Enviando HTML para processamento...', 'info');
+    
+    // Envia HTML para processamento
+    const response = await fetch('/api/parse-html', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ html: html })
+    });
+    
+    console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+    
+    // Verifica se a resposta é JSON
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const textResponse = await response.text();
+      console.error('Resposta não é JSON:', textResponse);
+      throw new Error('API retornou HTML ao invés de JSON. Verifique se o arquivo api/parse-html.js existe.');
+    }
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      this.handleSuperOddsData(data);
+      this.updateStatus('Manual', 'online');
+      this.addLog(`✅ HTML processado: ${data.totalOdds} SuperOdds encontradas`, 'success');
+      this.showNotification('Sucesso!', `${data.totalOdds} SuperOdds processadas do HTML`, 'success');
+      
+      // Limpa o textarea
+      document.getElementById('manualHtml').value = '';
+    } else {
+      throw new Error(data.error || 'Erro ao processar HTML');
+    }
+    
+  } catch (error) {
+    console.error('Erro completo:', error);
+    this.addLog(`❌ Erro no modo manual: ${error.message}`, 'error');
+    
+    // Erro específico se API não existe
+    if (error.message.includes('JSON') || error.message.includes('HTML ao invés')) {
+      this.showNotification(
+        'Arquivo API Ausente', 
+        'O arquivo api/parse-html.js não foi criado. Verifique se fez o deploy corretamente.', 
+        'error'
+      );
+    } else {
+      this.showNotification('Erro', error.message, 'error');
+    }
+  } finally {
+    this.showLoading(false);
+  }
+}
   // NOVA FUNÇÃO: Mostra instruções
   showInstructions() {
     const modal = document.createElement('div');
