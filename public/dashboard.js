@@ -84,24 +84,45 @@ class BetEsporteDashboard {
   }
 
   async startMonitoring() {
-    if (this.isMonitoring) return;
-    
-    this.isMonitoring = true;
-    this.addLog(`Monitoramento iniciado (intervalo: ${this.interval/1000}s)`, 'success');
-    this.updateStatus('Monitorando...', 'online');
-    
-    // Primeira verificação imediata
-    await this.fetchSuperOdds();
-    
-    // Inicia verificações periódicas
+  if (this.isMonitoring) {
+    console.log('⚠️ Monitoramento já está ativo');
+    return;
+  }
+  
+  console.log('▶️ Iniciando monitoramento...');
+  
+  // Remove modo manual se estava ativo
+  this.disableManualMode();
+  
+  this.isMonitoring = true;
+  this.addLog(`▶️ Monitoramento iniciado (intervalo: ${this.interval/1000}s)`, 'success');
+  this.updateStatus('Monitorando...', 'online');
+  
+  // Atualiza UI dos botões IMEDIATAMENTE
+  document.getElementById('startBtn').style.opacity = '0.5';
+  document.getElementById('startBtn').disabled = true;
+  document.getElementById('stopBtn').style.opacity = '1';
+  document.getElementById('stopBtn').disabled = false;
+  
+  // Primeira verificação imediata
+  await this.fetchSuperOdds();
+  
+  // Só inicia o interval se ainda está monitorando (pode ter parado durante o fetchSuperOdds)
+  if (this.isMonitoring) {
     this.intervalId = setInterval(() => {
-      this.fetchSuperOdds();
+      // Verifica se ainda deve estar monitorando
+      if (this.isMonitoring) {
+        this.fetchSuperOdds();
+      } else {
+        // Para o interval se não deveria estar rodando
+        clearInterval(this.intervalId);
+        this.intervalId = null;
+      }
     }, this.interval);
     
-    // Atualiza UI
-    document.getElementById('startBtn').style.opacity = '0.5';
-    document.getElementById('stopBtn').style.opacity = '1';
+    console.log('✅ Monitoramento ativo com interval:', this.intervalId);
   }
+}
 
   stopMonitoring() {
   if (!this.isMonitoring) return;
