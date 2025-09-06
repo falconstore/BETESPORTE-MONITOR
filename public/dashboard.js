@@ -7,6 +7,7 @@ class BetEsporteDashboard {
     this.theme = 'dark';
     this.filter = 'all';
     this.todayStats = { total: 0, updates: 0 };
+    this.manualModeEnabled = false; // NOVA PROPRIEDADE
     
     this.init();
   }
@@ -121,6 +122,7 @@ class BetEsporteDashboard {
     document.getElementById('stopBtn').disabled = true;
   }
 
+  // MÉTODO ATUALIZADO COM DETECÇÃO DE ERRO 403
   async fetchSuperOdds(force = false) {
     try {
       this.showLoading(true);
@@ -144,6 +146,8 @@ class BetEsporteDashboard {
       if (data.success) {
         this.handleSuperOddsData(data);
         this.updateStatus('Online', 'online');
+        // Remove modo manual se estava ativo
+        this.disableManualMode();
       } else {
         throw new Error(data.error || 'Erro desconhecido');
       }
@@ -152,10 +156,187 @@ class BetEsporteDashboard {
       console.error('❌ Erro ao buscar SuperOdds:', error);
       this.addLog(`Erro: ${error.message}`, 'error');
       this.updateStatus('Erro', 'error');
-      this.showNotification('Erro ao buscar SuperOdds', error.message, 'error');
+      
+      // NOVA FUNCIONALIDADE: Habilita modo manual se erro 403
+      if (error.message.includes('403') || 
+          error.message.includes('Forbidden') || 
+          error.message.includes('bloqueado') ||
+          error.message.includes('blocked')) {
+        this.enableManualMode();
+        this.showNotification('API Bloqueada', 'Modo manual ativado. Cole o HTML da página.', 'warning');
+      } else {
+        this.showNotification('Erro ao buscar SuperOdds', error.message, 'error');
+      }
     } finally {
       this.showLoading(false);
     }
+  }
+
+  // NOVA FUNÇÃO: Ativa modo manual
+  enableManualMode() {
+    if (this.manualModeEnabled) return;
+    
+    this.manualModeEnabled = true;
+    
+    const manualSection = document.createElement('div');
+    manualSection.id = 'manualModeSection';
+    manualSection.className = 'manual-mode-section';
+    manualSection.innerHTML = `
+      <div class="controls-card" style="border: 2px solid #f59e0b; background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), var(--bg-card));">
+        <h3>📝 Modo Manual Ativado</h3>
+        <p style="color: var(--warning); margin-bottom: 16px;">
+          🚫 A API está bloqueada. Use o modo manual para continuar monitorando.
+        </p>
+        
+        <div class="control-group">
+          <label>HTML da Página BETesporte:</label>
+          <textarea 
+            id="manualHtml" 
+            rows="8" 
+            placeholder="Cole aqui o HTML copiado da página do BETesporte..." 
+            style="font-family: monospace; font-size: 12px;"
+          ></textarea>
+        </div>
+        
+        <div class="control-buttons">
+          <button id="processManualBtn" class="btn btn-primary">🔍 Processar HTML</button>
+          <button id="getInstructionsBtn" class="btn btn-secondary">📋 Como obter HTML</button>
+          <button id="disableManualBtn" class="btn btn-small">❌ Desativar Modo Manual</button>
+        </div>
+      </div>
+    `;
+    
+    // Insere após a seção de controles
+    const controlsSection = document.querySelector('.controls-section');
+    controlsSection.after(manualSection);
+    
+    // Event listeners
+    document.getElementById('processManualBtn').addEventListener('click', () => this.processManualHtml());
+    document.getElementById('getInstructionsBtn').addEventListener('click', () => this.showInstructions());
+    document.getElementById('disableManualBtn').addEventListener('click', () => this.disableManualMode());
+    
+    this.addLog('📝 Modo manual ativado - API bloqueada', 'warning');
+  }
+
+  // NOVA FUNÇÃO: Desativa modo manual
+  disableManualMode() {
+    const manualSection = document.getElementById('manualModeSection');
+    if (manualSection) {
+      manualSection.remove();
+      this.manualModeEnabled = false;
+      this.addLog('✅ Modo manual desativado', 'success');
+    }
+  }
+
+  // NOVA FUNÇÃO: Processa HTML manual
+  async processManualHtml() {
+    const html = document.getElementById('manualHtml').value.trim();
+    
+    if (!html) {
+      this.showNotification('Erro', 'Cole o HTML da página primeiro', 'error');
+      return;
+    }
+    
+    if (html.length < 1000) {
+      this.showNotification('Aviso', 'HTML parece muito pequeno. Certifique-se de copiar a página completa.', 'warning');
+    }
+    
+    try {
+      this.showLoading(true);
+      
+      // Envia HTML para processamento
+      const response = await fetch('/api/parse-html', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ html: html })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        this.handleSuperOddsData(data);
+        this.updateStatus('Manual', 'online');
+        this.addLog(`📝 HTML processado: ${data.totalOdds} SuperOdds encontradas`, 'success');
+        this.showNotification('Sucesso!', `${data.totalOdds} SuperOdds processadas do HTML`, 'success');
+        
+        // Limpa o textarea
+        document.getElementById('manualHtml').value = '';
+      } else {
+        throw new Error(data.error || 'Erro ao processar HTML');
+      }
+      
+    } catch (error) {
+      this.addLog(`❌ Erro no modo manual: ${error.message}`, 'error');
+      this.showNotification('Erro', error.message, 'error');
+    } finally {
+      this.showLoading(false);
+    }
+  }
+
+  // NOVA FUNÇÃO: Mostra instruções
+  showInstructions() {
+    const modal = document.createElement('div');
+    modal.className = 'instruction-modal';
+    modal.innerHTML = `
+      <div class="modal-overlay">
+        <div class="modal-content">
+          <h3>📋 Como obter o HTML da página</h3>
+          
+          <div class="instruction-steps">
+            <div class="step">
+              <span class="step-number">1</span>
+              <div class="step-content">
+                <strong>Abra o BETesporte</strong>
+                <p>Navegue até a página de SuperOdds no seu navegador</p>
+              </div>
+            </div>
+            
+            <div class="step">
+              <span class="step-number">2</span>
+              <div class="step-content">
+                <strong>Abra DevTools</strong>
+                <p>Pressione <kbd>F12</kbd> ou <kbd>Ctrl+Shift+I</kbd></p>
+              </div>
+            </div>
+            
+            <div class="step">
+              <span class="step-number">3</span>
+              <div class="step-content">
+                <strong>Vá para Elements</strong>
+                <p>Clique na aba "Elements" ou "Elementos"</p>
+              </div>
+            </div>
+            
+            <div class="step">
+              <span class="step-number">4</span>
+              <div class="step-content">
+                <strong>Copie o HTML</strong>
+                <p>Clique com botão direito em <code>&lt;html&gt;</code><br>
+                Selecione "Copy" → "Copy outerHTML"</p>
+              </div>
+            </div>
+            
+            <div class="step">
+              <span class="step-number">5</span>
+              <div class="step-content">
+                <strong>Cole e Processe</strong>
+                <p>Cole no campo acima e clique "Processar HTML"</p>
+              </div>
+            </div>
+          </div>
+          
+          <div style="margin-top: 20px; padding: 12px; background: var(--bg-secondary); border-radius: 8px;">
+            <strong>💡 Dica:</strong> Atualize a página do BETesporte antes de copiar para garantir dados frescos.
+          </div>
+          
+          <button onclick="this.closest('.instruction-modal').remove()" class="btn btn-primary" style="margin-top: 16px;">
+            ✅ Entendi
+          </button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
   }
 
   handleSuperOddsData(data) {
@@ -276,6 +457,7 @@ class BetEsporteDashboard {
             🕐 ${new Date(odd.timestamp).toLocaleTimeString()}
           </div>
           ${odd.originalOdd ? `<div class="odd-original">Era: ${odd.originalOdd}</div>` : ''}
+          ${odd.source ? `<div class="odd-source">Via: ${odd.source}</div>` : ''}
         </div>
       </div>
     `;
