@@ -104,23 +104,45 @@ class BetEsporteDashboard {
   }
 
   stopMonitoring() {
-    if (!this.isMonitoring) return;
-    
-    this.isMonitoring = false;
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
-    }
-    
-    this.addLog('🛑 Monitoramento parado', 'warning');
-    this.updateStatus('Parado', 'warning');
-    
-    // Atualiza UI
-    document.getElementById('startBtn').style.opacity = '1';
-    document.getElementById('stopBtn').style.opacity = '0.5';
-    document.getElementById('startBtn').disabled = false;
-    document.getElementById('stopBtn').disabled = true;
+  if (!this.isMonitoring) return;
+  
+  console.log('🛑 Parando monitoramento...');
+  
+  // Para o monitoramento
+  this.isMonitoring = false;
+  
+  // Limpa interval se existir
+  if (this.intervalId) {
+    clearInterval(this.intervalId);
+    this.intervalId = null;
+    console.log('✅ Interval cleared');
   }
+  
+  // Atualiza status
+  this.addLog('🛑 Monitoramento parado pelo usuário', 'warning');
+  this.updateStatus('Parado', 'warning');
+  
+  // Atualiza UI dos botões
+  document.getElementById('startBtn').style.opacity = '1';
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('stopBtn').style.opacity = '0.5';
+  document.getElementById('stopBtn').disabled = true;
+  
+  // FORÇA ativação do modo manual se estava com erro
+  setTimeout(() => {
+    if (!this.manualModeEnabled) {
+      this.enableManualMode();
+      this.addLog('📝 Modo manual ativado - monitoramento parado', 'info');
+      this.showNotification(
+        'Monitoramento Parado', 
+        'Modo manual ativado. Cole o HTML para continuar monitorando.', 
+        'info'
+      );
+    }
+  }, 500);
+  
+  console.log('🛑 Monitoramento parado completamente');
+}
 
   // MÉTODO ATUALIZADO COM DETECÇÃO DE ERRO 403
   async fetchSuperOdds(force = false) {
