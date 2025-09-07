@@ -1,465 +1,201 @@
 console.log('🦈 Dashboard carregando...');
 
-class BetEsporteDashboard {
-  constructor() {
-    this.isMonitoring = false;
-    this.interval = 30000;
-    this.intervalId = null;
-    this.lastData = null;
-    this.theme = 'dark';
-    this.filter = 'all';
-    this.todayStats = { total: 0, updates: 0 };
-    this.manualModeEnabled = false;
-    
-    // PROPRIEDADES HTML BASE
-    this.htmlBaseMode = false;
-    this.savedHtmlBase = null;
-    this.htmlUpdateInterval = null;
-    this.lastOddsSignature = null;
-    
-    this.init();
+// Aguarda DOM carregar
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('🚀 DOM carregado, iniciando dashboard...');
+  
+  // Testa se botão existe
+  const htmlBaseBtn = document.getElementById('htmlBaseModeBtn');
+  console.log('🔍 Botão HTML Base encontrado:', htmlBaseBtn);
+  
+  if (htmlBaseBtn) {
+    htmlBaseBtn.addEventListener('click', function() {
+      console.log('🔄 Botão HTML Base clicado!');
+      showHtmlBaseSection();
+    });
+    console.log('✅ Event listener adicionado ao botão');
+  } else {
+    console.error('❌ Botão htmlBaseModeBtn não encontrado!');
   }
+  
+  // Cria objeto dashboard global
+  window.dashboard = {
+    enableHtmlBaseMode: showHtmlBaseSection
+  };
+  
+  console.log('✅ Dashboard criado:', window.dashboard);
+});
 
-  init() {
-    console.log('🦈 Dashboard inicializando...');
-    
-    this.loadSettings();
-    this.bindEvents();
-    this.updateStatus('Conectado', 'online');
-    this.addLog('Dashboard inicializado com sucesso', 'success');
+function showHtmlBaseSection() {
+  console.log('💾 Criando seção HTML Base...');
+  
+  // Remove seção existente
+  const existing = document.getElementById('htmlBaseSection');
+  if (existing) {
+    existing.remove();
+    console.log('🗑️ Seção anterior removida');
   }
-
-  bindEvents() {
-    // Theme toggle
-    const themeBtn = document.getElementById('themeToggle');
-    if (themeBtn) {
-      themeBtn.addEventListener('click', () => this.toggleTheme());
-    }
-
-    // HTML BASE MODE BUTTON - PRINCIPAL!
-    const htmlBaseBtn = document.getElementById('htmlBaseModeBtn');
-    if (htmlBaseBtn) {
-      htmlBaseBtn.addEventListener('click', () => {
-        console.log('🔄 Botão HTML Base clicado!');
-        this.enableHtmlBaseMode();
-      });
-    } else {
-      console.error('❌ Botão htmlBaseModeBtn não encontrado!');
-    }
-
-    // Control buttons
-    const startBtn = document.getElementById('startBtn');
-    if (startBtn) {
-      startBtn.addEventListener('click', () => this.startMonitoring());
-    }
-
-    const stopBtn = document.getElementById('stopBtn');
-    if (stopBtn) {
-      stopBtn.addEventListener('click', () => this.stopMonitoring());
-    }
-
-    const manualBtn = document.getElementById('manualModeBtn');
-    if (manualBtn) {
-      manualBtn.addEventListener('click', () => this.toggleManualMode());
-    }
-
-    // Clear log
-    const clearBtn = document.getElementById('clearLogBtn');
-    if (clearBtn) {
-      clearBtn.addEventListener('click', () => this.clearLog());
-    }
-  }
-
-  // ===== MODO HTML BASE =====
-  enableHtmlBaseMode() {
-    console.log('💾 Ativando modo HTML Base...');
-    this.htmlBaseMode = true;
+  
+  // Cria nova seção
+  const section = document.createElement('div');
+  section.id = 'htmlBaseSection';
+  section.style.cssText = 'margin: 20px 0; padding: 20px; background: #2a2a2a; border-radius: 12px; border: 2px solid #8b5cf6;';
+  
+  section.innerHTML = `
+    <h3 style="color: #8b5cf6; margin-bottom: 16px;">💾 Modo HTML Base Ativado!</h3>
+    <p style="color: #cbd5e1; margin-bottom: 16px;">🚀 Agora você pode colar o HTML do BETesporte:</p>
     
-    // Para outros modos se ativos
-    if (this.isMonitoring) {
-      this.stopMonitoring();
-    }
-    this.disableManualMode();
+    <div style="margin-bottom: 16px;">
+      <label style="display: block; color: #cbd5e1; margin-bottom: 8px; font-weight: 600;">Cole o HTML aqui:</label>
+      <textarea 
+        id="htmlInput" 
+        rows="8" 
+        placeholder="Cole o HTML copiado do BETesporte (F12 → Elements → Copy outerHTML)..."
+        style="width: 100%; padding: 12px; background: #1a1a1a; border: 2px solid #475569; border-radius: 8px; color: #f1f5f9; font-family: monospace; font-size: 12px; resize: vertical;"
+      ></textarea>
+    </div>
     
-    this.showHtmlBaseSection();
+    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+      <button id="saveHtmlBtn" onclick="saveHtml()" style="padding: 12px 20px; background: linear-gradient(135deg, #8b5cf6, #a855f7); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">💾 Salvar HTML</button>
+      <button id="testHtmlBtn" onclick="testHtml()" style="padding: 12px 20px; background: #22c55e; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;" disabled>🧪 Testar</button>
+      <button onclick="closeHtmlSection()" style="padding: 12px 20px; background: #dc2626; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">❌ Fechar</button>
+    </div>
     
-    this.addLog('💾 Modo HTML Base ativado', 'success');
-    this.updateStatus('HTML Base Mode', 'online');
-  }
-
-  showHtmlBaseSection() {
-    // Remove seção existente
-    const existing = document.getElementById('htmlBaseSection');
-    if (existing) existing.remove();
-    
-    // Cria nova seção
-    const htmlBaseSection = document.createElement('div');
-    htmlBaseSection.id = 'htmlBaseSection';
-    htmlBaseSection.className = 'html-base-section';
-    htmlBaseSection.innerHTML = `
-      <div class="controls-card" style="border: 2px solid #8b5cf6; background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), var(--bg-card));">
-        <h3>💾 Modo HTML Base + Auto-Update</h3>
-        <p style="color: #8b5cf6; margin-bottom: 16px;">
-          🚀 Salve o HTML uma vez e monitore só as SuperOdds automaticamente!
-        </p>
-        
-        <div style="margin: 16px 0;">
-          <div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px; background: var(--bg-secondary); border-radius: 12px; border-left: 4px solid #8b5cf6;">
-            <div style="background: #8b5cf6; color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px;">1</div>
-            <div style="flex: 1;">
-              <strong style="color: var(--text-primary); display: block; margin-bottom: 8px;">Cole o HTML Base:</strong>
-              <textarea 
-                id="htmlBaseInput" 
-                rows="6" 
-                placeholder="Cole aqui o HTML copiado do BETesporte..."
-                style="width: 100%; font-family: monospace; font-size: 11px; background: var(--bg-primary); border: 2px solid var(--border); border-radius: 8px; padding: 12px; color: var(--text-primary);"
-              ></textarea>
-            </div>
-          </div>
-        </div>
-        
-        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-          <button id="saveHtmlBaseBtn" class="btn btn-primary">💾 Salvar HTML Base</button>
-          <button id="startHtmlUpdateBtn" class="btn btn-accent" disabled>🔄 Iniciar Auto-Update</button>
-          <button id="testHtmlBaseBtn" class="btn btn-outline" disabled>🧪 Testar Agora</button>
-          <button id="disableHtmlBaseBtn" class="btn btn-small">❌ Desativar Modo</button>
-        </div>
-        
-        <div style="margin-top: 16px; padding: 12px; background: var(--bg-secondary); border-radius: 8px;">
-          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; font-size: 12px;">
-            <div>
-              <strong style="color: #8b5cf6;">HTML Salvo:</strong>
-              <div id="htmlSizeInfo">--</div>
-            </div>
-            <div>
-              <strong style="color: #8b5cf6;">Última Verificação:</strong>
-              <div id="lastHtmlCheck">--</div>
-            </div>
-            <div>
-              <strong style="color: #8b5cf6;">SuperOdds Detectadas:</strong>
-              <div id="htmlOddsCount">--</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-    
-    // Adiciona depois da seção de controles
-    const controlsSection = document.querySelector('.controls-section');
-    if (controlsSection) {
-      controlsSection.after(htmlBaseSection);
-    }
-    
-    // Adiciona event listeners
-    const saveBtn = document.getElementById('saveHtmlBaseBtn');
-    if (saveBtn) {
-      saveBtn.addEventListener('click', () => this.saveHtmlBase());
-    }
-
-    const startBtn = document.getElementById('startHtmlUpdateBtn');
-    if (startBtn) {
-      startBtn.addEventListener('click', () => this.startHtmlAutoUpdate());
-    }
-
-    const testBtn = document.getElementById('testHtmlBaseBtn');
-    if (testBtn) {
-      testBtn.addEventListener('click', () => this.testHtmlBase());
-    }
-
-    const disableBtn = document.getElementById('disableHtmlBaseBtn');
-    if (disableBtn) {
-      disableBtn.addEventListener('click', () => this.disableHtmlBaseMode());
-    }
-  }
-
-  async saveHtmlBase() {
-    const html = document.getElementById('htmlBaseInput').value.trim();
-    
-    if (!html) {
-      this.showNotification('Erro', 'Cole o HTML da página primeiro', 'error');
-      return;
-    }
-    
-    try {
-      this.savedHtmlBase = html;
-      
-      // Salva no localStorage
-      localStorage.setItem('betesporte_html_base', html);
-      localStorage.setItem('betesporte_html_base_timestamp', Date.now());
-      
-      const sizeInfo = document.getElementById('htmlSizeInfo');
-      if (sizeInfo) {
-        sizeInfo.textContent = `${Math.round(html.length / 1024)}KB`;
-      }
-      
-      const startBtn = document.getElementById('startHtmlUpdateBtn');
-      if (startBtn) startBtn.disabled = false;
-      
-      const testBtn = document.getElementById('testHtmlBaseBtn');
-      if (testBtn) testBtn.disabled = false;
-      
-      // Testa imediatamente
-      await this.testHtmlBase();
-      
-      this.addLog('💾 HTML base salvo com sucesso', 'success');
-      this.showNotification('HTML Salvo!', 'Base HTML salva. Agora pode iniciar auto-update.', 'success');
-      
-    } catch (error) {
-      this.addLog(`❌ Erro ao salvar HTML: ${error.message}`, 'error');
-      this.showNotification('Erro', error.message, 'error');
-    }
-  }
-
-  startHtmlAutoUpdate() {
-    if (!this.savedHtmlBase) {
-      this.showNotification('Erro', 'Salve o HTML base primeiro', 'error');
-      return;
-    }
-    
-    this.addLog('🔄 Auto-update iniciado (1 minuto)', 'success');
-    
-    // Primeira verificação imediata
-    this.processHtmlBase();
-    
-    // Inicia interval de 1 minuto
-    this.htmlUpdateInterval = setInterval(() => {
-      this.processHtmlBase();
-    }, 60000);
-    
-    // Atualiza botões
-    const startBtn = document.getElementById('startHtmlUpdateBtn');
-    if (startBtn) startBtn.disabled = true;
-  }
-
-  async testHtmlBase() {
-    if (!this.savedHtmlBase) {
-      this.showNotification('Erro', 'Nenhum HTML base salvo', 'error');
-      return;
-    }
-    
-    await this.processHtmlBase(true);
-  }
-
-  async processHtmlBase(isTest = false) {
-    try {
-      this.addLog(isTest ? '🧪 Testando HTML base...' : '🔍 Verificando mudanças...', 'info');
-      
-      // Usa a API parse-html
-      const response = await fetch('/api/parse-html', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ html: this.savedHtmlBase })
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        // Atualiza interface
-        const oddsCount = document.getElementById('htmlOddsCount');
-        if (oddsCount) oddsCount.textContent = data.totalOdds;
-        
-        const lastCheck = document.getElementById('lastHtmlCheck');
-        if (lastCheck) lastCheck.textContent = new Date().toLocaleTimeString();
-        
-        this.updateOddsDisplay(data.odds);
-        this.updateStats(data);
-        
-        this.addLog(`💾 HTML processado: ${data.totalOdds} SuperOdds encontradas`, 'success');
-        
-        if (!isTest && data.totalOdds > 0) {
-          this.showNotification('SuperOdds Atualizadas!', `${data.totalOdds} odds do HTML base`, 'success');
-        }
-        
-      } else {
-        throw new Error(data.error || 'Erro ao processar HTML base');
-      }
-      
-    } catch (error) {
-      this.addLog(`❌ Erro no HTML base: ${error.message}`, 'error');
-      
-      if (isTest) {
-        this.showNotification('Erro no Teste', error.message, 'error');
-      }
-    }
-  }
-
-  disableHtmlBaseMode() {
-    this.htmlBaseMode = false;
-    
-    // Para auto-update
-    if (this.htmlUpdateInterval) {
-      clearInterval(this.htmlUpdateInterval);
-      this.htmlUpdateInterval = null;
-    }
-    
-    // Remove seção
-    const section = document.getElementById('htmlBaseSection');
-    if (section) section.remove();
-    
-    this.addLog('❌ Modo HTML Base desativado', 'info');
-    this.updateStatus('Parado', 'warning');
-  }
-
-  // ===== MÉTODOS BÁSICOS =====
-  toggleTheme() {
-    this.theme = this.theme === 'dark' ? 'light' : 'dark';
-    document.body.setAttribute('data-theme', this.theme);
-    const themeBtn = document.getElementById('themeToggle');
-    if (themeBtn) {
-      themeBtn.textContent = this.theme === 'dark' ? '🌙' : '☀️';
-    }
-    this.saveSettings();
-  }
-
-  startMonitoring() {
-    this.addLog('⚠️ Use o Modo HTML Base para economizar bandwidth!', 'warning');
-  }
-
-  stopMonitoring() {
-    this.addLog('⏹️ Monitoramento parado', 'info');
-  }
-
-  toggleManualMode() {
-    this.addLog('💡 Use o Modo HTML Base - é mais eficiente!', 'info');
-  }
-
-  updateOddsDisplay(odds) {
-    const container = document.getElementById('oddsContainer');
-    if (!container) return;
-    
-    if (!odds || odds.length === 0) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">🎲</div>
-          <h4>Nenhuma SuperOdd encontrada</h4>
-          <p>Use o Modo HTML Base para monitorar</p>
-        </div>
-      `;
-      return;
-    }
-    
-    const oddsHTML = `
-      <div class="odds-grid">
-        ${odds.map(odd => `
-          <div class="odd-card">
-            <div class="odd-header">
-              <div class="odd-value">${odd.oddValue.toFixed(2)}</div>
-            </div>
-            <div class="odd-market">${odd.market}</div>
-            <div class="odd-team">${odd.team}</div>
-            <div class="odd-meta">
-              <div class="odd-time">🕐 ${new Date(odd.timestamp).toLocaleTimeString()}</div>
-            </div>
-          </div>
-        `).join('')}
-      </div>
-    `;
-    
-    container.innerHTML = oddsHTML;
-  }
-
-  updateStats(data) {
-    const totalOdds = document.getElementById('totalOdds');
-    if (totalOdds) totalOdds.textContent = data.totalOdds || 0;
-    
-    const maxOdd = document.getElementById('maxOdd');
-    if (maxOdd && data.odds.length > 0) {
-      const max = Math.max(...data.odds.map(o => o.oddValue)).toFixed(2);
-      maxOdd.textContent = max;
-    }
-    
-    const lastUpdate = document.getElementById('lastUpdate');
-    if (lastUpdate) {
-      lastUpdate.textContent = new Date().toLocaleTimeString();
-    }
-  }
-
-  updateStatus(text, type) {
-    const indicator = document.getElementById('statusIndicator');
-    if (!indicator) return;
-    
-    const dot = indicator.querySelector('.status-dot');
-    const span = indicator.querySelector('span');
-    
-    if (dot) dot.className = `status-dot ${type}`;
-    if (span) span.textContent = text;
-  }
-
-  addLog(message, type = 'info') {
-    const container = document.getElementById('logContainer');
-    if (!container) return;
-    
-    const time = new Date().toLocaleTimeString();
-    
-    const logEntry = document.createElement('div');
-    logEntry.className = `log-entry ${type}`;
-    logEntry.innerHTML = `
-      <span class="log-time">[${time}]</span>
-      <span class="log-message">${message}</span>
-    `;
-    
-    container.insertBefore(logEntry, container.firstChild);
-    
-    // Limita a 50 entradas
-    while (container.children.length > 50) {
-      container.removeChild(container.lastChild);
-    }
-  }
-
-  clearLog() {
-    const container = document.getElementById('logContainer');
-    if (container) {
-      container.innerHTML = '';
-      this.addLog('Log limpo', 'info');
-    }
-  }
-
-  showNotification(title, message, type = 'info') {
-    // Notificação simples no console por enquanto
-    console.log(`${title}: ${message}`);
-    
-    // Também adiciona no log
-    this.addLog(`${title}: ${message}`, type);
-  }
-
-  disableManualMode() {
-    // Placeholder
-  }
-
-  saveSettings() {
-    const settings = {
-      theme: this.theme,
-      interval: this.interval,
-      filter: this.filter,
-      todayStats: this.todayStats
-    };
-    localStorage.setItem('betesporte_dashboard_settings', JSON.stringify(settings));
-  }
-
-  loadSettings() {
-    try {
-      const saved = localStorage.getItem('betesporte_dashboard_settings');
-      if (saved) {
-        const settings = JSON.parse(saved);
-        this.theme = settings.theme || 'dark';
-        
-        document.body.setAttribute('data-theme', this.theme);
-        const themeBtn = document.getElementById('themeToggle');
-        if (themeBtn) {
-          themeBtn.textContent = this.theme === 'dark' ? '🌙' : '☀️';
-        }
-      }
-    } catch (error) {
-      console.warn('Erro ao carregar configurações:', error);
-    }
+    <div id="htmlStatus" style="margin-top: 16px; padding: 12px; background: #1a1a1a; border-radius: 8px; color: #cbd5e1; font-size: 12px;">
+      <strong>Status:</strong> Aguardando HTML...
+    </div>
+  `;
+  
+  // Adiciona depois da seção de controles
+  const controlsSection = document.querySelector('.controls-section');
+  if (controlsSection) {
+    controlsSection.after(section);
+    console.log('✅ Seção HTML Base criada com sucesso!');
+  } else {
+    console.error('❌ Seção de controles não encontrada!');
   }
 }
 
-// Inicializa quando DOM estiver pronto
-document.addEventListener('DOMContentLoaded', () => {
-  console.log('🚀 Criando dashboard...');
-  window.dashboard = new BetEsporteDashboard();
+function saveHtml() {
+  console.log('💾 Salvando HTML...');
   
-  console.log('✅ Dashboard criado:', window.dashboard);
-  console.log('🧪 Teste: dashboard.enableHtmlBaseMode()');
-});
+  const input = document.getElementById('htmlInput');
+  const html = input.value.trim();
+  
+  if (!html) {
+    updateStatus('❌ Cole o HTML primeiro!', 'error');
+    return;
+  }
+  
+  if (html.length < 1000) {
+    updateStatus('⚠️ HTML parece muito pequeno...', 'warning');
+  }
+  
+  // Salva no localStorage
+  localStorage.setItem('betesporte_html_base', html);
+  localStorage.setItem('betesporte_html_save_time', Date.now());
+  
+  // Habilita botão de teste
+  const testBtn = document.getElementById('testHtmlBtn');
+  if (testBtn) testBtn.disabled = false;
+  
+  updateStatus(`✅ HTML salvo! Tamanho: ${Math.round(html.length / 1024)}KB`, 'success');
+  console.log('✅ HTML salvo no localStorage');
+}
+
+function testHtml() {
+  console.log('🧪 Testando HTML...');
+  
+  const html = localStorage.getItem('betesporte_html_base');
+  if (!html) {
+    updateStatus('❌ Nenhum HTML salvo!', 'error');
+    return;
+  }
+  
+  updateStatus('🔍 Enviando HTML para análise...', 'info');
+  
+  // Testa API parse-html
+  fetch('/api/parse-html', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ html: html })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      updateStatus(`🎯 Sucesso! Encontradas ${data.totalOdds} SuperOdds`, 'success');
+      console.log('🎯 Resultado:', data);
+      
+      // Mostra odds encontradas
+      if (data.odds && data.odds.length > 0) {
+        showOdds(data.odds);
+      }
+    } else {
+      updateStatus(`❌ Erro: ${data.error}`, 'error');
+      console.error('❌ Erro da API:', data);
+    }
+  })
+  .catch(error => {
+    updateStatus(`❌ Erro de conexão: ${error.message}`, 'error');
+    console.error('❌ Erro:', error);
+  });
+}
+
+function closeHtmlSection() {
+  const section = document.getElementById('htmlBaseSection');
+  if (section) {
+    section.remove();
+    console.log('🗑️ Seção HTML Base fechada');
+  }
+}
+
+function updateStatus(message, type) {
+  const status = document.getElementById('htmlStatus');
+  if (status) {
+    const colors = {
+      success: '#22c55e',
+      error: '#dc2626', 
+      warning: '#f59e0b',
+      info: '#3b82f6'
+    };
+    
+    status.innerHTML = `<strong style="color: ${colors[type] || '#cbd5e1'}">Status:</strong> ${message}`;
+  }
+  console.log(`📊 ${message}`);
+}
+
+function showOdds(odds) {
+  console.log('📊 Mostrando odds:', odds);
+  
+  const container = document.getElementById('oddsContainer');
+  if (!container) return;
+  
+  if (odds.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 40px; color: #cbd5e1;">
+        <div style="font-size: 3rem; margin-bottom: 16px;">🎲</div>
+        <h4>Nenhuma SuperOdd encontrada</h4>
+        <p>O HTML foi processado mas não encontrou SuperOdds</p>
+      </div>
+    `;
+    return;
+  }
+  
+  const oddsHTML = odds.map(odd => `
+    <div style="background: #2a2a2a; border-radius: 12px; padding: 20px; border-left: 4px solid #3b82f6;">
+      <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+        <div style="font-size: 1.75rem; font-weight: 800; color: #3b82f6;">${odd.oddValue.toFixed(2)}</div>
+      </div>
+      <div style="font-size: 1rem; font-weight: 600; color: #f1f5f9; margin-bottom: 4px;">${odd.market}</div>
+      <div style="font-size: 0.875rem; color: #cbd5e1; margin-bottom: 8px;">${odd.team}</div>
+      <div style="font-size: 0.75rem; color: #94a3b8;">
+        🕐 ${new Date(odd.timestamp).toLocaleTimeString()}
+        ${odd.source ? ` • Via: ${odd.source}` : ''}
+      </div>
+    </div>
+  `).join('');
+  
+  container.innerHTML = `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px;">${oddsHTML}</div>`;
+}
+
+console.log('📁 dashboard.js carregado completamente!');
