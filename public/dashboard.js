@@ -8,6 +8,12 @@ class BetEsporteDashboard {
     this.filter = 'all';
     this.todayStats = { total: 0, updates: 0 };
     this.manualModeEnabled = false;
+    this.htmlBaseMode = false;
+    this.savedHtmlBase = null;
+    this.htmlUpdateInterval = null;
+    this.lastOddsSignature = null;
+  
+    this.init();
     
     // NOVAS PROPRIEDADES HTML BASE
     this.htmlBaseMode = false;
@@ -40,6 +46,10 @@ class BetEsporteDashboard {
     // Refresh button
     document.getElementById('refreshBtn').addEventListener('click', () => {
       this.fetchSuperOdds(true);
+    });
+
+    document.getElementById('htmlBaseModeBtn').addEventListener('click', () => {
+    this.enableHtmlBaseMode();
     });
 
     // Control buttons
